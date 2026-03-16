@@ -155,3 +155,45 @@ go test ./...
 ```bash
 go build ./...
 ```
+
+## 开发期临时启动 Docker 容器
+
+构建镜像：
+
+```bash
+docker build -t scaffold-api:dev .
+```
+
+如果开发机上的 PostgreSQL 运行在宿主机，可以直接用环境变量临时启动容器：
+
+```bash
+docker run --rm -it \
+  --name scaffold-api-dev \
+  --add-host=host.docker.internal:host-gateway \
+  -p 8080:8080 \
+  -e APP_DB_DSN='postgres://postgres:postgres@host.docker.internal:5432/scaffold_api?sslmode=disable' \
+  scaffold-api:dev
+```
+
+说明：
+
+- `--rm` 在容器退出后自动清理，适合开发期临时启动
+- `--add-host=host.docker.internal:host-gateway` 主要用于 Linux，让容器访问宿主机服务
+- 启动后可访问 `http://127.0.0.1:8080/swagger/index.html`
+
+如果想继续复用本地配置文件，也可以挂载配置文件启动：
+
+```bash
+cp configs/config.yaml.example configs/config.yaml
+```
+
+将 `configs/config.yaml` 里的 `db_dsn` 改成宿主机可访问地址，例如 `host.docker.internal`，然后执行：
+
+```bash
+docker run --rm -it \
+  --name scaffold-api-dev \
+  --add-host=host.docker.internal:host-gateway \
+  -p 8080:8080 \
+  -v "$(pwd)/configs/config.yaml:/app/config.yaml:ro" \
+  scaffold-api:dev --config /app/config.yaml
+```

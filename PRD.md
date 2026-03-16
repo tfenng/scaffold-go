@@ -135,8 +135,3 @@ Fx 注入所有依赖
 Echo 启动 HTTP 服务
 Asynq 启动后台 worker
 Zerolog 全局日志追踪
-
-作者：golang学习记
-链接：https://juejin.cn/post/7599565587153109018
-来源：稀土掘金
-著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
