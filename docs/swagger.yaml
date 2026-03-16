@@ -1,0 +1,372 @@
+basePath: /
+definitions:
+  server.ErrorDetail:
+    properties:
+      code:
+        example: validation_error
+        type: string
+      fields:
+        additionalProperties:
+          type: string
+        type: object
+      message:
+        example: validation failed
+        type: string
+    type: object
+  server.ErrorEnvelope:
+    properties:
+      error:
+        $ref: '#/definitions/server.ErrorDetail'
+    type: object
+  server.HealthResponse:
+    properties:
+      status:
+        example: ok
+        type: string
+    type: object
+  server.Pagination:
+    properties:
+      page:
+        example: 1
+        type: integer
+      page_size:
+        example: 20
+        type: integer
+      total:
+        example: 100
+        type: integer
+    type: object
+  server.UserDetailEnvelope:
+    properties:
+      data:
+        $ref: '#/definitions/server.UserResponse'
+    type: object
+  server.UserListEnvelope:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/server.UserResponse'
+        type: array
+      pagination:
+        $ref: '#/definitions/server.Pagination'
+    type: object
+  server.UserResponse:
+    properties:
+      birth:
+        example: "1990-01-01"
+        type: string
+      company:
+        example: ACME
+        type: string
+      created_at:
+        example: Mon, 02 Jan 2006 15:04:05 GMT
+        type: string
+      email:
+        example: alice@example.com
+        type: string
+      id:
+        example: 1
+        type: integer
+      name:
+        example: Alice
+        type: string
+      uid:
+        example: user-001
+        type: string
+      updated_at:
+        example: Mon, 02 Jan 2006 15:04:05 GMT
+        type: string
+      used_name:
+        example: Ali
+        type: string
+    type: object
+  service.CreateUserInput:
+    properties:
+      birth:
+        example: "1990-01-01"
+        type: string
+      company:
+        example: ACME
+        maxLength: 255
+        type: string
+      email:
+        example: alice@example.com
+        maxLength: 255
+        type: string
+      name:
+        example: Alice
+        maxLength: 255
+        type: string
+      uid:
+        example: user-001
+        maxLength: 64
+        type: string
+      used_name:
+        example: Ali
+        maxLength: 255
+        type: string
+    required:
+    - name
+    - uid
+    type: object
+  service.UpdateUserInput:
+    properties:
+      birth:
+        example: "1990-01-01"
+        type: string
+      company:
+        example: ACME
+        maxLength: 255
+        type: string
+      email:
+        example: alice@example.com
+        maxLength: 255
+        type: string
+      name:
+        example: Alice
+        maxLength: 255
+        type: string
+      used_name:
+        example: Ali
+        maxLength: 255
+        type: string
+    required:
+    - name
+    type: object
+info:
+  contact: {}
+  description: Online Swagger documentation for the users CRUD service.
+  title: Scaffold API Users API
+  version: "1.0"
+paths:
+  /api/v1/users:
+    get:
+      description: List users with optional email and name filters.
+      parameters:
+      - description: Filter by exact email
+        in: query
+        name: email
+        type: string
+      - description: Filter by partial name match
+        in: query
+        name: name_like
+        type: string
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/server.UserListEnvelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/server.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorEnvelope'
+      summary: List users
+      tags:
+      - users
+    post:
+      consumes:
+      - application/json
+      description: Create a new user record.
+      parameters:
+      - description: Create user payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/service.CreateUserInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/server.UserDetailEnvelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/server.ErrorEnvelope'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/server.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorEnvelope'
+      summary: Create user
+      tags:
+      - users
+  /api/v1/users/{id}:
+    delete:
+      description: Delete a user by ID.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/server.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/server.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorEnvelope'
+      summary: Delete user
+      tags:
+      - users
+    get:
+      description: Fetch a single user by its numeric identifier.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/server.UserDetailEnvelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/server.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/server.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorEnvelope'
+      summary: Get user by ID
+      tags:
+      - users
+    patch:
+      consumes:
+      - application/json
+      description: Replace user fields by ID.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Update user payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/service.UpdateUserInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/server.UserDetailEnvelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/server.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/server.ErrorEnvelope'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/server.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorEnvelope'
+      summary: Update user
+      tags:
+      - users
+    put:
+      consumes:
+      - application/json
+      description: Replace user fields by ID.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Update user payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/service.UpdateUserInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/server.UserDetailEnvelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/server.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/server.ErrorEnvelope'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/server.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorEnvelope'
+      summary: Update user
+      tags:
+      - users
+  /healthz:
+    get:
+      description: Returns the service health status.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/server.HealthResponse'
+      summary: Health check
+      tags:
+      - system
+schemes:
+- http
+- https
+swagger: "2.0"

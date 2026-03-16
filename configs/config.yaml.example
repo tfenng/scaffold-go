@@ -1,0 +1,14 @@
+app_name: scaffold-api
+environment: dev
+
+http_host: 0.0.0.0
+http_port: 8080
+http_read_timeout_seconds: 15
+http_write_timeout_seconds: 15
+http_shutdown_timeout_seconds: 10
+
+db_dsn: postgres://postgres:postgres@127.0.0.1:5432/scaffold_api?sslmode=disable
+db_auto_migrate: true
+
+log_level: info
+log_pretty: true
