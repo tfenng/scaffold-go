@@ -104,6 +104,26 @@ go run . serve
 - Swagger UI 适合前端、测试或联调直接查看和在线调试
 - Swagger JSON 适合前端工具链、API 平台或网关做机器消费
 
+## 本地前端跨域联调
+
+服务端已显式开启本地开发常用的 CORS 配置，默认允许以下前端来源直接访问 API：
+
+- `http://localhost:3000`
+- `http://127.0.0.1:3000`
+
+同时会返回这些跨域响应头，并正确处理浏览器的 `OPTIONS` 预检请求：
+
+- `Access-Control-Allow-Origin`
+- `Access-Control-Allow-Methods`
+- `Access-Control-Allow-Headers`
+- `Access-Control-Allow-Credentials`
+
+因此前端页面如果运行在 `3000` 端口，可以直接请求：
+
+```text
+http://localhost:8080
+```
+
 ## 生成 Swagger 文档
 
 项目已经提交了生成产物：
@@ -171,7 +191,7 @@ docker run --rm -it \
   --name scaffold-api-dev \
   --add-host=host.docker.internal:host-gateway \
   -p 8080:8080 \
-  -e APP_DB_DSN='postgres://postgres:postgres@host.docker.internal:5432/scaffold_api?sslmode=disable' \
+  -e APP_DB_DSN='postgres://xmap:xmap@host.docker.internal:5432/scaffold?sslmode=disable' \
   scaffold-api:dev
 ```
 
