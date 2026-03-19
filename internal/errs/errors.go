@@ -3,9 +3,11 @@ package errs
 import "errors"
 
 var (
-	ErrNotFound   = errors.New("not found")
-	ErrConflict   = errors.New("conflict")
-	ErrValidation = errors.New("validation failed")
+	ErrNotFound        = errors.New("not found")
+	ErrConflict        = errors.New("conflict")
+	ErrInvalidArgument = errors.New("invalid argument")
+	ErrValidation      = ErrInvalidArgument
+	ErrInternal        = errors.New("internal")
 )
 
 type AppError struct {
@@ -43,6 +45,23 @@ func NewConflict(message string) *AppError {
 	return &AppError{Code: "conflict", Message: message, Err: ErrConflict}
 }
 
+func NewInvalidArgument(message string, fields map[string]string) *AppError {
+	return &AppError{
+		Code:    "validation_error",
+		Message: message,
+		Fields:  fields,
+		Err:     ErrInvalidArgument,
+	}
+}
+
 func NewValidation(message string, fields map[string]string) *AppError {
-	return &AppError{Code: "validation_error", Message: message, Fields: fields, Err: ErrValidation}
+	return NewInvalidArgument(message, fields)
+}
+
+func NewInternal(err error) *AppError {
+	return &AppError{
+		Code:    "internal_error",
+		Message: "internal server error",
+		Err:     errors.Join(ErrInternal, err),
+	}
 }

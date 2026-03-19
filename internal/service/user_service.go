@@ -2,12 +2,16 @@ package service
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
+	"scaffold-api/internal/db/query"
 	"scaffold-api/internal/errs"
-	"scaffold-api/internal/model"
-	"scaffold-api/internal/repository"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const (
@@ -43,25 +47,34 @@ type ListUsersInput struct {
 }
 
 type UserPage struct {
-	Items    []model.User
+	Items    []query.User
 	Total    int64
 	Page     int
 	PageSize int
 }
 
+type UserStore interface {
+	CreateUser(ctx context.Context, arg query.CreateUserParams) (query.User, error)
+	GetUserByID(ctx context.Context, id int64) (query.User, error)
+	ListUsers(ctx context.Context, arg query.ListUsersParams) ([]query.User, error)
+	CountUsers(ctx context.Context, arg query.CountUsersParams) (int64, error)
+	UpdateUser(ctx context.Context, arg query.UpdateUserParams) (query.User, error)
+	DeleteUser(ctx context.Context, id int64) (int64, error)
+}
+
 type UserService struct {
-	repo repository.UserRepository
+	store UserStore
 }
 
-func NewUserService(repo repository.UserRepository) *UserService {
-	return &UserService{repo: repo}
+func NewUserService(store UserStore) *UserService {
+	return &UserService{store: store}
 }
 
-func (s *UserService) Create(ctx context.Context, input CreateUserInput) (*model.User, error) {
+func (s *UserService) Create(ctx context.Context, input CreateUserInput) (*query.User, error) {
 	uid := strings.TrimSpace(input.UID)
 	name := strings.TrimSpace(input.Name)
 	if uid == "" || name == "" {
-		return nil, errs.NewValidation("uid and name are required", map[string]string{
+		return nil, errs.NewInvalidArgument("uid and name are required", map[string]string{
 			"uid":  "uid is required",
 			"name": "name is required",
 		})
@@ -72,20 +85,27 @@ func (s *UserService) Create(ctx context.Context, input CreateUserInput) (*model
 		return nil, err
 	}
 
-	user := &model.User{
-		UID:      uid,
+	user, err := s.store.CreateUser(ctx, query.CreateUserParams{
+		Uid:      uid,
 		Name:     name,
-		Email:    normalizeOptionalString(input.Email),
+		Email:    nullableText(normalizeOptionalString(input.Email)),
 		UsedName: strings.TrimSpace(input.UsedName),
 		Company:  strings.TrimSpace(input.Company),
-		Birth:    birth,
+		Birth:    nullableDate(birth),
+	})
+	if err != nil {
+		return nil, translateStoreError(err)
 	}
 
-	return s.repo.Create(ctx, user)
+	return &user, nil
 }
 
-func (s *UserService) GetByID(ctx context.Context, id uint64) (*model.User, error) {
-	return s.repo.GetByID(ctx, id)
+func (s *UserService) GetByID(ctx context.Context, id int64) (*query.User, error) {
+	user, err := s.store.GetUserByID(ctx, id)
+	if err != nil {
+		return nil, translateStoreError(err)
+	}
+	return &user, nil
 }
 
 func (s *UserService) List(ctx context.Context, input ListUsersInput) (*UserPage, error) {
@@ -102,14 +122,24 @@ func (s *UserService) List(ctx context.Context, input ListUsersInput) (*UserPage
 		pageSize = maxPageSize
 	}
 
-	items, total, err := s.repo.List(ctx, repository.UserListFilter{
-		Email:    normalizeOptionalString(input.Email),
-		NameLike: normalizeOptionalString(input.NameLike),
-		Limit:    pageSize,
-		Offset:   (page - 1) * pageSize,
+	filters := query.CountUsersParams{
+		Email:    nullableText(normalizeOptionalString(input.Email)),
+		NameLike: nullableText(normalizeOptionalString(input.NameLike)),
+	}
+
+	items, err := s.store.ListUsers(ctx, query.ListUsersParams{
+		Email:    filters.Email,
+		NameLike: filters.NameLike,
+		Offset:   int32((page - 1) * pageSize),
+		Limit:    int32(pageSize),
 	})
 	if err != nil {
-		return nil, err
+		return nil, translateStoreError(err)
+	}
+
+	total, err := s.store.CountUsers(ctx, filters)
+	if err != nil {
+		return nil, translateStoreError(err)
 	}
 
 	return &UserPage{
@@ -120,10 +150,10 @@ func (s *UserService) List(ctx context.Context, input ListUsersInput) (*UserPage
 	}, nil
 }
 
-func (s *UserService) Update(ctx context.Context, id uint64, input UpdateUserInput) (*model.User, error) {
+func (s *UserService) Update(ctx context.Context, id int64, input UpdateUserInput) (*query.User, error) {
 	name := strings.TrimSpace(input.Name)
 	if name == "" {
-		return nil, errs.NewValidation("name is required", map[string]string{
+		return nil, errs.NewInvalidArgument("name is required", map[string]string{
 			"name": "name is required",
 		})
 	}
@@ -133,17 +163,30 @@ func (s *UserService) Update(ctx context.Context, id uint64, input UpdateUserInp
 		return nil, err
 	}
 
-	return s.repo.Update(ctx, id, repository.UserUpdatePatch{
+	user, err := s.store.UpdateUser(ctx, query.UpdateUserParams{
+		ID:       id,
 		Name:     name,
-		Email:    normalizeOptionalString(input.Email),
+		Email:    nullableText(normalizeOptionalString(input.Email)),
 		UsedName: strings.TrimSpace(input.UsedName),
 		Company:  strings.TrimSpace(input.Company),
-		Birth:    birth,
+		Birth:    nullableDate(birth),
 	})
+	if err != nil {
+		return nil, translateStoreError(err)
+	}
+
+	return &user, nil
 }
 
-func (s *UserService) Delete(ctx context.Context, id uint64) error {
-	return s.repo.Delete(ctx, id)
+func (s *UserService) Delete(ctx context.Context, id int64) error {
+	rows, err := s.store.DeleteUser(ctx, id)
+	if err != nil {
+		return translateStoreError(err)
+	}
+	if rows == 0 {
+		return errs.NewNotFound("user not found")
+	}
+	return nil
 }
 
 func parseBirth(value *string) (*time.Time, error) {
@@ -158,7 +201,7 @@ func parseBirth(value *string) (*time.Time, error) {
 
 	parsed, err := time.Parse(dateLayout, raw)
 	if err != nil {
-		return nil, errs.NewValidation("birth must be in YYYY-MM-DD format", map[string]string{
+		return nil, errs.NewInvalidArgument("birth must be in YYYY-MM-DD format", map[string]string{
 			"birth": "birth must use YYYY-MM-DD",
 		})
 	}
@@ -177,4 +220,41 @@ func normalizeOptionalString(value *string) *string {
 	}
 
 	return &trimmed
+}
+
+func nullableText(value *string) pgtype.Text {
+	if value == nil {
+		return pgtype.Text{}
+	}
+	return pgtype.Text{String: *value, Valid: true}
+}
+
+func nullableDate(value *time.Time) pgtype.Date {
+	if value == nil {
+		return pgtype.Date{}
+	}
+	return pgtype.Date{Time: *value, Valid: true}
+}
+
+func translateStoreError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		return errs.NewNotFound("user not found")
+	}
+
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		if pgErr.Code == "23505" {
+			return errs.NewConflict("user uid or email already exists")
+		}
+	}
+
+	var appErr *errs.AppError
+	if errors.As(err, &appErr) {
+		return appErr
+	}
+
+	return errs.NewInternal(err)
 }

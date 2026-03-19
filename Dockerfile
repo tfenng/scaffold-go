@@ -20,11 +20,9 @@ RUN apk add --no-cache ca-certificates tzdata \
 	&& adduser -S -G app app
 
 COPY --from=builder /out/scaffold-api /usr/local/bin/scaffold-api
-COPY configs/config.yaml.example /app/configs/config.yaml.example
 
 USER app
 
 EXPOSE 8080
 
 ENTRYPOINT ["scaffold-api"]
-CMD ["serve"]

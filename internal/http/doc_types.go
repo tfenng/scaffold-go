@@ -1,4 +1,4 @@
-package server
+package httpapi
 
 // HealthResponse describes the health check payload.
 type HealthResponse struct {
@@ -26,7 +26,7 @@ type Pagination struct {
 
 // UserResponse describes a user returned by the API.
 type UserResponse struct {
-	ID        uint64  `json:"id" example:"1"`
+	ID        int64   `json:"id" example:"1"`
 	UID       string  `json:"uid" example:"user-001"`
 	Email     *string `json:"email,omitempty" example:"alice@example.com"`
 	Name      string  `json:"name" example:"Alice"`

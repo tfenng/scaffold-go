@@ -1,36 +1,45 @@
 package logger
 
 import (
-	"io"
+	"fmt"
+	"log/slog"
 	"os"
-	"time"
+	"strings"
 
 	"scaffold-api/internal/config"
-
-	"github.com/rs/zerolog"
 )
 
-func New(cfg *config.Config) (zerolog.Logger, error) {
-	level, err := zerolog.ParseLevel(cfg.LogLevel)
+func New(cfg *config.Config) (*slog.Logger, error) {
+	level, err := parseLevel(cfg.LogLevel)
 	if err != nil {
-		return zerolog.Logger{}, err
+		return nil, err
 	}
 
-	zerolog.SetGlobalLevel(level)
-
-	var writer io.Writer = os.Stdout
-	if cfg.LogPretty {
-		writer = zerolog.ConsoleWriter{
-			Out:        os.Stdout,
-			TimeFormat: time.RFC3339,
-		}
+	options := &slog.HandlerOptions{Level: level}
+	var handler slog.Handler
+	if cfg.AppEnv == "dev" {
+		handler = slog.NewTextHandler(os.Stdout, options)
+	} else {
+		handler = slog.NewJSONHandler(os.Stdout, options)
 	}
 
-	logger := zerolog.New(writer).With().
-		Timestamp().
-		Str("app", cfg.AppName).
-		Logger().
-		Level(level)
+	return slog.New(handler).With(
+		slog.String("service", cfg.ServiceName),
+		slog.String("env", cfg.AppEnv),
+	), nil
+}
 
-	return logger, nil
+func parseLevel(raw string) (slog.Level, error) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", "info":
+		return slog.LevelInfo, nil
+	case "debug":
+		return slog.LevelDebug, nil
+	case "warn", "warning":
+		return slog.LevelWarn, nil
+	case "error":
+		return slog.LevelError, nil
+	default:
+		return 0, fmt.Errorf("invalid LOG_LEVEL: %s", raw)
+	}
 }

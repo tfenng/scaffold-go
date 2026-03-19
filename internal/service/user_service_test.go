@@ -2,55 +2,67 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
-	"scaffold-api/internal/model"
-	"scaffold-api/internal/repository"
+	"scaffold-api/internal/db/query"
+	"scaffold-api/internal/errs"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/require"
 )
 
-type stubUserRepository struct {
-	createFn func(context.Context, *model.User) (*model.User, error)
-	listFn   func(context.Context, repository.UserListFilter) ([]model.User, int64, error)
-	updateFn func(context.Context, uint64, repository.UserUpdatePatch) (*model.User, error)
+type stubUserStore struct {
+	createFn func(context.Context, query.CreateUserParams) (query.User, error)
+	listFn   func(context.Context, query.ListUsersParams) ([]query.User, error)
+	countFn  func(context.Context, query.CountUsersParams) (int64, error)
+	updateFn func(context.Context, query.UpdateUserParams) (query.User, error)
 }
 
-func (s stubUserRepository) Create(ctx context.Context, user *model.User) (*model.User, error) {
-	return s.createFn(ctx, user)
+func (s stubUserStore) CreateUser(ctx context.Context, arg query.CreateUserParams) (query.User, error) {
+	return s.createFn(ctx, arg)
 }
 
-func (s stubUserRepository) GetByID(context.Context, uint64) (*model.User, error) {
-	return nil, nil
+func (s stubUserStore) GetUserByID(context.Context, int64) (query.User, error) {
+	return query.User{}, nil
 }
 
-func (s stubUserRepository) List(ctx context.Context, filter repository.UserListFilter) ([]model.User, int64, error) {
-	return s.listFn(ctx, filter)
+func (s stubUserStore) ListUsers(ctx context.Context, arg query.ListUsersParams) ([]query.User, error) {
+	return s.listFn(ctx, arg)
 }
 
-func (s stubUserRepository) Update(ctx context.Context, id uint64, patch repository.UserUpdatePatch) (*model.User, error) {
-	return s.updateFn(ctx, id, patch)
+func (s stubUserStore) CountUsers(ctx context.Context, arg query.CountUsersParams) (int64, error) {
+	return s.countFn(ctx, arg)
 }
 
-func (s stubUserRepository) Delete(context.Context, uint64) error {
-	return nil
+func (s stubUserStore) UpdateUser(ctx context.Context, arg query.UpdateUserParams) (query.User, error) {
+	return s.updateFn(ctx, arg)
+}
+
+func (s stubUserStore) DeleteUser(context.Context, int64) (int64, error) {
+	return 1, nil
 }
 
 func TestCreateNormalizesOptionalFields(t *testing.T) {
 	t.Parallel()
 
-	var captured *model.User
-	svc := NewUserService(stubUserRepository{
-		createFn: func(_ context.Context, user *model.User) (*model.User, error) {
-			captured = user
-			return user, nil
+	var captured query.CreateUserParams
+	svc := NewUserService(stubUserStore{
+		createFn: func(_ context.Context, arg query.CreateUserParams) (query.User, error) {
+			captured = arg
+			return query.User{}, nil
 		},
-		listFn: func(context.Context, repository.UserListFilter) ([]model.User, int64, error) {
-			return nil, 0, nil
-		},
-		updateFn: func(context.Context, uint64, repository.UserUpdatePatch) (*model.User, error) {
+		listFn: func(context.Context, query.ListUsersParams) ([]query.User, error) {
 			return nil, nil
+		},
+		countFn: func(context.Context, query.CountUsersParams) (int64, error) {
+			return 0, nil
+		},
+		updateFn: func(context.Context, query.UpdateUserParams) (query.User, error) {
+			return query.User{}, nil
 		},
 	})
 
@@ -66,29 +78,31 @@ func TestCreateNormalizesOptionalFields(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	require.NotNil(t, captured)
-	require.Equal(t, "user-001", captured.UID)
+	require.Equal(t, "user-001", captured.Uid)
 	require.Equal(t, "Alice", captured.Name)
-	require.NotNil(t, captured.Email)
-	require.Equal(t, "alice@example.com", *captured.Email)
+	require.True(t, captured.Email.Valid)
+	require.Equal(t, "alice@example.com", captured.Email.String)
 	require.Equal(t, "ali", captured.UsedName)
 	require.Equal(t, "ACME", captured.Company)
-	require.NotNil(t, captured.Birth)
-	require.Equal(t, "2024-10-01", captured.Birth.Format("2006-01-02"))
+	require.True(t, captured.Birth.Valid)
+	require.Equal(t, "2024-10-01", captured.Birth.Time.Format("2006-01-02"))
 }
 
 func TestCreateRejectsInvalidBirth(t *testing.T) {
 	t.Parallel()
 
-	svc := NewUserService(stubUserRepository{
-		createFn: func(_ context.Context, user *model.User) (*model.User, error) {
-			return user, nil
+	svc := NewUserService(stubUserStore{
+		createFn: func(_ context.Context, arg query.CreateUserParams) (query.User, error) {
+			return query.User{}, nil
 		},
-		listFn: func(context.Context, repository.UserListFilter) ([]model.User, int64, error) {
-			return nil, 0, nil
-		},
-		updateFn: func(context.Context, uint64, repository.UserUpdatePatch) (*model.User, error) {
+		listFn: func(context.Context, query.ListUsersParams) ([]query.User, error) {
 			return nil, nil
+		},
+		countFn: func(context.Context, query.CountUsersParams) (int64, error) {
+			return 0, nil
+		},
+		updateFn: func(context.Context, query.UpdateUserParams) (query.User, error) {
+			return query.User{}, nil
 		},
 	})
 
@@ -105,17 +119,27 @@ func TestCreateRejectsInvalidBirth(t *testing.T) {
 func TestListAppliesPageDefaultsAndCapsSize(t *testing.T) {
 	t.Parallel()
 
-	var captured repository.UserListFilter
-	svc := NewUserService(stubUserRepository{
-		createFn: func(_ context.Context, user *model.User) (*model.User, error) {
-			return user, nil
+	var captured query.ListUsersParams
+	svc := NewUserService(stubUserStore{
+		createFn: func(_ context.Context, arg query.CreateUserParams) (query.User, error) {
+			return query.User{}, nil
 		},
-		listFn: func(_ context.Context, filter repository.UserListFilter) ([]model.User, int64, error) {
-			captured = filter
-			return []model.User{{ID: 1, Name: "Alice", CreatedAt: time.Now()}}, 1, nil
+		listFn: func(_ context.Context, arg query.ListUsersParams) ([]query.User, error) {
+			captured = arg
+			return []query.User{{
+				ID:   1,
+				Name: "Alice",
+				CreatedAt: pgtype.Timestamptz{
+					Time:  time.Now(),
+					Valid: true,
+				},
+			}}, nil
 		},
-		updateFn: func(context.Context, uint64, repository.UserUpdatePatch) (*model.User, error) {
-			return nil, nil
+		countFn: func(context.Context, query.CountUsersParams) (int64, error) {
+			return 1, nil
+		},
+		updateFn: func(context.Context, query.UpdateUserParams) (query.User, error) {
+			return query.User{}, nil
 		},
 	})
 
@@ -129,8 +153,36 @@ func TestListAppliesPageDefaultsAndCapsSize(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, page.Page)
 	require.Equal(t, maxPageSize, page.PageSize)
-	require.Equal(t, maxPageSize, captured.Limit)
-	require.Equal(t, 0, captured.Offset)
-	require.NotNil(t, captured.NameLike)
-	require.Equal(t, "Alice", *captured.NameLike)
+	require.Equal(t, int32(maxPageSize), captured.Limit)
+	require.Equal(t, int32(0), captured.Offset)
+	require.True(t, captured.NameLike.Valid)
+	require.Equal(t, "Alice", captured.NameLike.String)
+}
+
+func TestTranslateStoreErrorMapsNoRowsToNotFound(t *testing.T) {
+	t.Parallel()
+
+	err := translateStoreError(pgx.ErrNoRows)
+
+	require.Error(t, err)
+	require.ErrorIs(t, err, errs.ErrNotFound)
+}
+
+func TestTranslateStoreErrorMapsUniqueViolationToConflict(t *testing.T) {
+	t.Parallel()
+
+	err := translateStoreError(&pgconn.PgError{Code: "23505"})
+
+	require.Error(t, err)
+	require.ErrorIs(t, err, errs.ErrConflict)
+}
+
+func TestTranslateStoreErrorWrapsUnknownAsInternal(t *testing.T) {
+	t.Parallel()
+
+	root := errors.New("boom")
+	err := translateStoreError(root)
+
+	require.Error(t, err)
+	require.ErrorIs(t, err, errs.ErrInternal)
 }

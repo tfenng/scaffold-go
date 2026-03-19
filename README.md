@@ -1,95 +1,129 @@
 # scaffold-api
 
-基于 `Cobra + Viper + Fx + Echo + GORM + Zerolog` 的最小 Go 后端脚手架，目前只实现 `users` 数据模型的 RESTful CRUD 管理接口，并集成在线 Swagger 文档。
+基于 `chi + slog + pgx + sqlc + Swagger` 的最小 Go 后端脚手架，当前实现 `users` 资源的 RESTful CRUD，并保留在线 Swagger 文档。
 
 ## 功能概览
 
 - `users` CRUD 接口
-- PostgreSQL + GORM 持久化
-- `Cobra` 主应用入口
-- `Viper` 配置加载
+- PostgreSQL 持久化
+- `sqlc` 生成查询代码
+- `golang-migrate` 管理数据库迁移
 - 在线 Swagger UI
 - 机器可读 Swagger JSON
+- `Makefile` 驱动常用开发命令
 
 ## 环境要求
 
 - Go `1.22.2+`
 - PostgreSQL
+- 可选工具：
+  - `sqlc`
+  - `migrate`
+  - `swag`
 
-## 主应用入口
+## 快速开始
 
-程序入口是：
-
-- `main.go`
-- `scaffold-api serve`
-
-查看命令帮助：
+复制环境变量模板：
 
 ```bash
-go run . --help
-go run . serve --help
+cp .env.sample .env.dev
 ```
 
-启动 HTTP 服务：
+根据本地 PostgreSQL 实际情况修改 `.env.dev` 中的 `DB_DSN`，然后启动服务：
 
 ```bash
-go run . serve --config configs/config.yaml
+make dev
 ```
 
-也可以直接通过 flag 启动：
+也可以直接使用脚本：
 
 ```bash
-go run . serve \
-  --db-dsn 'postgres://postgres:postgres@127.0.0.1:5432/scaffold_api?sslmode=disable' \
-  --http-port 8080
-```
-
-编译后二进制启动方式：
-
-```bash
-go build -o scaffold-api .
-./scaffold-api serve --config configs/config.yaml
+./run.sh
 ```
 
 ## 配置说明
 
-项目使用 `Viper` 加载配置，优先级如下：
+项目改为纯环境变量配置，不再依赖 `config.yaml` 和 `--config`。
 
-`命令行 Flag > 环境变量 > 配置文件 > 默认值`
-
-默认会尝试读取：
-
-- 当前目录下的 `config.yaml`
-- `configs/config.yaml`
-
-也可以通过 `--config` 指定路径。
-
-配置样例见：
-
-- `configs/config.yaml.example`
-
-当前支持的主要配置项：
+当前主要配置项：
 
 | Key | 说明 | 默认值 |
 | --- | --- | --- |
-| `app_name` | 应用名 | `scaffold-api` |
-| `environment` | 运行环境 | `dev` |
-| `http_host` | HTTP 监听地址 | `0.0.0.0` |
-| `http_port` | HTTP 监听端口 | `8080` |
-| `http_read_timeout_seconds` | HTTP 读超时 | `15` |
-| `http_write_timeout_seconds` | HTTP 写超时 | `15` |
-| `http_shutdown_timeout_seconds` | HTTP 关闭超时 | `10` |
-| `db_dsn` | PostgreSQL DSN | 必填 |
-| `db_auto_migrate` | 启动时自动迁移 | `true` |
-| `log_level` | 日志级别 | `info` |
-| `log_pretty` | 控制台友好日志 | `true` |
+| `APP_ENV` | 运行环境 | `dev` |
+| `HTTP_HOST` | HTTP 监听地址 | `0.0.0.0` |
+| `HTTP_PORT` | HTTP 监听端口 | `8080` |
+| `DB_DSN` | PostgreSQL DSN | 必填 |
+| `LOG_LEVEL` | 日志级别 | `info` |
+| `CORS_ALLOW_ORIGINS` | 允许的前端来源，逗号分隔 | `http://localhost:3000,http://127.0.0.1:3000` |
 
-环境变量前缀为 `APP_`，例如：
+示例：
 
 ```bash
-export APP_DB_DSN='postgres://postgres:postgres@127.0.0.1:5432/scaffold_api?sslmode=disable'
-export APP_HTTP_PORT=8080
-go run . serve
+export APP_ENV=dev
+export HTTP_PORT=8080
+export DB_DSN='postgres://postgres:postgres@127.0.0.1:5432/scaffold_api?sslmode=disable'
+go run .
+```
+
+## 运行与开发命令
+
+常用命令通过 `Makefile` 提供：
+
+```bash
+make dev
+make build
+make test
+make sqlc
+make migrate-up
+make migrate-down
+make swagger
+make swagger-check
+```
+
+说明：
+
+- `make dev` 会默认加载 `.env.dev`
+- `make sqlc` 依赖本地已安装 `sqlc`
+- `make migrate-up` / `make migrate-down` 依赖当前 shell 已设置 `DB_DSN`
+- `make swagger` 会执行 `go generate ./...`
+
+## 数据库迁移
+
+迁移文件位于：
+
+- `db/migrations/`
+
+执行迁移前，请先导出 `DB_DSN`：
+
+```bash
+export DB_DSN='postgres://postgres:postgres@127.0.0.1:5432/scaffold_api?sslmode=disable'
+make migrate-up
+```
+
+回滚一版迁移：
+
+```bash
+make migrate-down
+```
+
+## SQL 与数据访问
+
+`sqlc` 配置文件位于：
+
+- `sqlc.yaml`
+
+查询源文件位于：
+
+- `db/query/users.sql`
+
+生成代码位于：
+
+- `internal/db/query/`
+
+重新生成查询代码：
+
+```bash
+make sqlc
 ```
 
 ## 在线 API 文档
@@ -99,34 +133,7 @@ go run . serve
 - Swagger UI: `http://127.0.0.1:8080/swagger/index.html`
 - Swagger JSON: `http://127.0.0.1:8080/swagger/swagger.json`
 
-说明：
-
-- Swagger UI 适合前端、测试或联调直接查看和在线调试
-- Swagger JSON 适合前端工具链、API 平台或网关做机器消费
-
-## 本地前端跨域联调
-
-服务端已显式开启本地开发常用的 CORS 配置，默认允许以下前端来源直接访问 API：
-
-- `http://localhost:3000`
-- `http://127.0.0.1:3000`
-
-同时会返回这些跨域响应头，并正确处理浏览器的 `OPTIONS` 预检请求：
-
-- `Access-Control-Allow-Origin`
-- `Access-Control-Allow-Methods`
-- `Access-Control-Allow-Headers`
-- `Access-Control-Allow-Credentials`
-
-因此前端页面如果运行在 `3000` 端口，可以直接请求：
-
-```text
-http://localhost:8080
-```
-
-## 生成 Swagger 文档
-
-项目已经提交了生成产物：
+Swagger 生成产物已提交到仓库：
 
 - `docs/docs.go`
 - `docs/swagger.json`
@@ -135,19 +142,13 @@ http://localhost:8080
 如果修改了接口注释或请求/响应结构体，需要重新生成：
 
 ```bash
-go generate ./...
+make swagger
 ```
 
-`go generate` 依赖本地安装 `swag`。首次使用可执行：
+校验 Swagger 产物是否已同步：
 
 ```bash
-go install github.com/swaggo/swag/cmd/swag@v1.16.4
-```
-
-也可以直接手动生成：
-
-```bash
-swag init --parseInternal -g main.go -o docs
+make swagger-check
 ```
 
 ## 接口清单
@@ -162,58 +163,37 @@ swag init --parseInternal -g main.go -o docs
 - `PATCH /api/v1/users/{id}`
 - `DELETE /api/v1/users/{id}`
 
-## 开发与验证
+## 测试与构建
 
 运行测试：
 
 ```bash
-go test ./...
+make test
 ```
 
 构建应用：
 
 ```bash
-go build ./...
+make build
+```
+
+构建 Docker 镜像：
+
+```bash
+./build.sh
 ```
 
 ## 开发期临时启动 Docker 容器
 
-构建镜像：
+默认流程：
 
 ```bash
-docker build -t scaffold-api:dev .
-```
-
-如果开发机上的 PostgreSQL 运行在宿主机，可以直接用环境变量临时启动容器：
-
-```bash
-docker run --rm -it \
-  --name scaffold-api-dev \
-  --add-host=host.docker.internal:host-gateway \
-  -p 8080:8080 \
-  -e APP_DB_DSN='postgres://xmap:xmap@host.docker.internal:5432/scaffold?sslmode=disable' \
-  scaffold-api:dev
+./build.sh
+./runD.sh
 ```
 
 说明：
 
-- `--rm` 在容器退出后自动清理，适合开发期临时启动
-- `--add-host=host.docker.internal:host-gateway` 主要用于 Linux，让容器访问宿主机服务
-- 启动后可访问 `http://127.0.0.1:8080/swagger/index.html`
-
-如果想继续复用本地配置文件，也可以挂载配置文件启动：
-
-```bash
-cp configs/config.yaml.example configs/config.yaml
-```
-
-将 `configs/config.yaml` 里的 `db_dsn` 改成宿主机可访问地址，例如 `host.docker.internal`，然后执行：
-
-```bash
-docker run --rm -it \
-  --name scaffold-api-dev \
-  --add-host=host.docker.internal:host-gateway \
-  -p 8080:8080 \
-  -v "$(pwd)/configs/config.yaml:/app/config.yaml:ro" \
-  scaffold-api:dev --config /app/config.yaml
-```
+- `runD.sh` 默认读取 `.env.dev`
+- 如果 `DB_DSN` 中使用了 `localhost` 或 `127.0.0.1`，脚本会自动替换为 `host.docker.internal`
+- Linux 下会自动增加 `host.docker.internal:host-gateway` 映射，方便容器访问宿主机 PostgreSQL

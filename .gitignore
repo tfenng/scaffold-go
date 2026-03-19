@@ -1,2 +1,4 @@
 configs/config.yaml
 scaffold-api
+.env.dev
+.env.production

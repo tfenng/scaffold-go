@@ -55,19 +55,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/server.UserListEnvelope"
+                            "$ref": "#/definitions/httpapi.UserListEnvelope"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/server.ErrorEnvelope"
+                            "$ref": "#/definitions/httpapi.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/server.ErrorEnvelope"
+                            "$ref": "#/definitions/httpapi.ErrorEnvelope"
                         }
                     }
                 }
@@ -99,25 +99,25 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/server.UserDetailEnvelope"
+                            "$ref": "#/definitions/httpapi.UserDetailEnvelope"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/server.ErrorEnvelope"
+                            "$ref": "#/definitions/httpapi.ErrorEnvelope"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/server.ErrorEnvelope"
+                            "$ref": "#/definitions/httpapi.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/server.ErrorEnvelope"
+                            "$ref": "#/definitions/httpapi.ErrorEnvelope"
                         }
                     }
                 }
@@ -146,25 +146,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/server.UserDetailEnvelope"
+                            "$ref": "#/definitions/httpapi.UserDetailEnvelope"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/server.ErrorEnvelope"
+                            "$ref": "#/definitions/httpapi.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/server.ErrorEnvelope"
+                            "$ref": "#/definitions/httpapi.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/server.ErrorEnvelope"
+                            "$ref": "#/definitions/httpapi.ErrorEnvelope"
                         }
                     }
                 }
@@ -203,31 +203,31 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/server.UserDetailEnvelope"
+                            "$ref": "#/definitions/httpapi.UserDetailEnvelope"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/server.ErrorEnvelope"
+                            "$ref": "#/definitions/httpapi.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/server.ErrorEnvelope"
+                            "$ref": "#/definitions/httpapi.ErrorEnvelope"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/server.ErrorEnvelope"
+                            "$ref": "#/definitions/httpapi.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/server.ErrorEnvelope"
+                            "$ref": "#/definitions/httpapi.ErrorEnvelope"
                         }
                     }
                 }
@@ -257,19 +257,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/server.ErrorEnvelope"
+                            "$ref": "#/definitions/httpapi.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/server.ErrorEnvelope"
+                            "$ref": "#/definitions/httpapi.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/server.ErrorEnvelope"
+                            "$ref": "#/definitions/httpapi.ErrorEnvelope"
                         }
                     }
                 }
@@ -308,31 +308,31 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/server.UserDetailEnvelope"
+                            "$ref": "#/definitions/httpapi.UserDetailEnvelope"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/server.ErrorEnvelope"
+                            "$ref": "#/definitions/httpapi.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/server.ErrorEnvelope"
+                            "$ref": "#/definitions/httpapi.ErrorEnvelope"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/server.ErrorEnvelope"
+                            "$ref": "#/definitions/httpapi.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/server.ErrorEnvelope"
+                            "$ref": "#/definitions/httpapi.ErrorEnvelope"
                         }
                     }
                 }
@@ -352,7 +352,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/server.HealthResponse"
+                            "$ref": "#/definitions/httpapi.HealthResponse"
                         }
                     }
                 }
@@ -360,7 +360,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "server.ErrorDetail": {
+        "httpapi.ErrorDetail": {
             "type": "object",
             "properties": {
                 "code": {
@@ -379,15 +379,15 @@ const docTemplate = `{
                 }
             }
         },
-        "server.ErrorEnvelope": {
+        "httpapi.ErrorEnvelope": {
             "type": "object",
             "properties": {
                 "error": {
-                    "$ref": "#/definitions/server.ErrorDetail"
+                    "$ref": "#/definitions/httpapi.ErrorDetail"
                 }
             }
         },
-        "server.HealthResponse": {
+        "httpapi.HealthResponse": {
             "type": "object",
             "properties": {
                 "status": {
@@ -396,7 +396,7 @@ const docTemplate = `{
                 }
             }
         },
-        "server.Pagination": {
+        "httpapi.Pagination": {
             "type": "object",
             "properties": {
                 "page": {
@@ -413,29 +413,29 @@ const docTemplate = `{
                 }
             }
         },
-        "server.UserDetailEnvelope": {
+        "httpapi.UserDetailEnvelope": {
             "type": "object",
             "properties": {
                 "data": {
-                    "$ref": "#/definitions/server.UserResponse"
+                    "$ref": "#/definitions/httpapi.UserResponse"
                 }
             }
         },
-        "server.UserListEnvelope": {
+        "httpapi.UserListEnvelope": {
             "type": "object",
             "properties": {
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/server.UserResponse"
+                        "$ref": "#/definitions/httpapi.UserResponse"
                     }
                 },
                 "pagination": {
-                    "$ref": "#/definitions/server.Pagination"
+                    "$ref": "#/definitions/httpapi.Pagination"
                 }
             }
         },
-        "server.UserResponse": {
+        "httpapi.UserResponse": {
             "type": "object",
             "properties": {
                 "birth": {

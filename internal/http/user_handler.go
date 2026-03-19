@@ -1,42 +1,34 @@
-package server
+package httpapi
 
 import (
+	"encoding/json"
 	"errors"
-	"net/http"
+	"math"
+	stdhttp "net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"scaffold-api/internal/db/query"
 	"scaffold-api/internal/errs"
-	"scaffold-api/internal/model"
 	"scaffold-api/internal/service"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
-	"github.com/labstack/echo/v4"
 )
 
 // UserHandler handles user CRUD requests.
 type UserHandler struct {
-	service *service.UserService
+	service  *service.UserService
+	validate *validator.Validate
 }
 
 // NewUserHandler creates a user handler.
 func NewUserHandler(service *service.UserService) *UserHandler {
-	return &UserHandler{service: service}
-}
-
-// RegisterUserRoutes mounts user CRUD routes on the Echo engine.
-func RegisterUserRoutes(e *echo.Echo, handler *UserHandler) {
-	RegisterHealthRoutes(e)
-
-	api := e.Group("/api/v1")
-	users := api.Group("/users")
-	users.POST("", handler.Create)
-	users.GET("", handler.List)
-	users.GET("/:id", handler.GetByID)
-	users.PUT("/:id", handler.Update)
-	users.PATCH("/:id", handler.Update)
-	users.DELETE("/:id", handler.Delete)
+	return &UserHandler{
+		service:  service,
+		validate: validator.New(),
+	}
 }
 
 // Create godoc
@@ -51,25 +43,22 @@ func RegisterUserRoutes(e *echo.Echo, handler *UserHandler) {
 // @Failure 409 {object} ErrorEnvelope
 // @Failure 500 {object} ErrorEnvelope
 // @Router /api/v1/users [post]
-func (h *UserHandler) Create(c echo.Context) error {
+func (h *UserHandler) Create(w stdhttp.ResponseWriter, r *stdhttp.Request) error {
 	var req service.CreateUserInput
-	if err := c.Bind(&req); err != nil {
-		return errs.NewValidation("invalid request body", map[string]string{
-			"body": "request body is invalid",
-		})
+	if err := decodeJSON(r, &req); err != nil {
+		return err
 	}
-	if err := c.Validate(&req); err != nil {
+	if err := h.validate.Struct(&req); err != nil {
 		return translateValidationError(err)
 	}
 
-	user, err := h.service.Create(c.Request().Context(), req)
+	user, err := h.service.Create(r.Context(), req)
 	if err != nil {
 		return err
 	}
 
-	return c.JSON(http.StatusCreated, UserDetailEnvelope{
-		Data: newUserResponse(*user),
-	})
+	writeJSON(w, stdhttp.StatusCreated, UserDetailEnvelope{Data: newUserResponse(*user)})
+	return nil
 }
 
 // GetByID godoc
@@ -83,20 +72,19 @@ func (h *UserHandler) Create(c echo.Context) error {
 // @Failure 404 {object} ErrorEnvelope
 // @Failure 500 {object} ErrorEnvelope
 // @Router /api/v1/users/{id} [get]
-func (h *UserHandler) GetByID(c echo.Context) error {
-	id, err := parseUserID(c.Param("id"))
+func (h *UserHandler) GetByID(w stdhttp.ResponseWriter, r *stdhttp.Request) error {
+	id, err := parseUserID(chi.URLParam(r, "id"))
 	if err != nil {
 		return err
 	}
 
-	user, err := h.service.GetByID(c.Request().Context(), id)
+	user, err := h.service.GetByID(r.Context(), id)
 	if err != nil {
 		return err
 	}
 
-	return c.JSON(http.StatusOK, UserDetailEnvelope{
-		Data: newUserResponse(*user),
-	})
+	writeJSON(w, stdhttp.StatusOK, UserDetailEnvelope{Data: newUserResponse(*user)})
+	return nil
 }
 
 // List godoc
@@ -112,24 +100,22 @@ func (h *UserHandler) GetByID(c echo.Context) error {
 // @Failure 400 {object} ErrorEnvelope
 // @Failure 500 {object} ErrorEnvelope
 // @Router /api/v1/users [get]
-func (h *UserHandler) List(c echo.Context) error {
-	page, err := parseIntQuery(c, "page")
+func (h *UserHandler) List(w stdhttp.ResponseWriter, r *stdhttp.Request) error {
+	page, err := parseIntQuery(r, "page")
 	if err != nil {
 		return err
 	}
-	pageSize, err := parseIntQuery(c, "page_size")
+	pageSize, err := parseIntQuery(r, "page_size")
 	if err != nil {
 		return err
 	}
 
-	input := service.ListUsersInput{
-		Email:    optionalQuery(c, "email"),
-		NameLike: optionalQuery(c, "name_like"),
+	result, err := h.service.List(r.Context(), service.ListUsersInput{
+		Email:    optionalQuery(r, "email"),
+		NameLike: optionalQuery(r, "name_like"),
 		Page:     page,
 		PageSize: pageSize,
-	}
-
-	result, err := h.service.List(c.Request().Context(), input)
+	})
 	if err != nil {
 		return err
 	}
@@ -139,7 +125,7 @@ func (h *UserHandler) List(c echo.Context) error {
 		items = append(items, newUserResponse(item))
 	}
 
-	return c.JSON(http.StatusOK, UserListEnvelope{
+	writeJSON(w, stdhttp.StatusOK, UserListEnvelope{
 		Data: items,
 		Pagination: Pagination{
 			Page:     result.Page,
@@ -147,6 +133,7 @@ func (h *UserHandler) List(c echo.Context) error {
 			Total:    result.Total,
 		},
 	})
+	return nil
 }
 
 // Update godoc
@@ -164,30 +151,27 @@ func (h *UserHandler) List(c echo.Context) error {
 // @Failure 500 {object} ErrorEnvelope
 // @Router /api/v1/users/{id} [put]
 // @Router /api/v1/users/{id} [patch]
-func (h *UserHandler) Update(c echo.Context) error {
-	id, err := parseUserID(c.Param("id"))
+func (h *UserHandler) Update(w stdhttp.ResponseWriter, r *stdhttp.Request) error {
+	id, err := parseUserID(chi.URLParam(r, "id"))
 	if err != nil {
 		return err
 	}
 
 	var req service.UpdateUserInput
-	if err := c.Bind(&req); err != nil {
-		return errs.NewValidation("invalid request body", map[string]string{
-			"body": "request body is invalid",
-		})
+	if err := decodeJSON(r, &req); err != nil {
+		return err
 	}
-	if err := c.Validate(&req); err != nil {
+	if err := h.validate.Struct(&req); err != nil {
 		return translateValidationError(err)
 	}
 
-	user, err := h.service.Update(c.Request().Context(), id, req)
+	user, err := h.service.Update(r.Context(), id, req)
 	if err != nil {
 		return err
 	}
 
-	return c.JSON(http.StatusOK, UserDetailEnvelope{
-		Data: newUserResponse(*user),
-	})
+	writeJSON(w, stdhttp.StatusOK, UserDetailEnvelope{Data: newUserResponse(*user)})
+	return nil
 }
 
 // Delete godoc
@@ -201,30 +185,43 @@ func (h *UserHandler) Update(c echo.Context) error {
 // @Failure 404 {object} ErrorEnvelope
 // @Failure 500 {object} ErrorEnvelope
 // @Router /api/v1/users/{id} [delete]
-func (h *UserHandler) Delete(c echo.Context) error {
-	id, err := parseUserID(c.Param("id"))
+func (h *UserHandler) Delete(w stdhttp.ResponseWriter, r *stdhttp.Request) error {
+	id, err := parseUserID(chi.URLParam(r, "id"))
 	if err != nil {
 		return err
 	}
 
-	if err := h.service.Delete(c.Request().Context(), id); err != nil {
+	if err := h.service.Delete(r.Context(), id); err != nil {
 		return err
 	}
 
-	return c.NoContent(http.StatusNoContent)
+	w.WriteHeader(stdhttp.StatusNoContent)
+	return nil
 }
 
-func newUserResponse(user model.User) UserResponse {
+func decodeJSON(r *stdhttp.Request, dest any) error {
+	defer r.Body.Close()
+
+	if err := json.NewDecoder(r.Body).Decode(dest); err != nil {
+		return errs.NewInvalidArgument("invalid request body", map[string]string{
+			"body": "request body is invalid",
+		})
+	}
+
+	return nil
+}
+
+func newUserResponse(user query.User) UserResponse {
 	return UserResponse{
 		ID:        user.ID,
-		UID:       user.UID,
+		UID:       user.Uid,
 		Email:     user.Email,
 		Name:      user.Name,
 		UsedName:  user.UsedName,
 		Company:   user.Company,
 		Birth:     formatDate(user.Birth),
-		CreatedAt: user.CreatedAt.Format(http.TimeFormat),
-		UpdatedAt: user.UpdatedAt.Format(http.TimeFormat),
+		CreatedAt: formatTimestamp(user.CreatedAt.Time),
+		UpdatedAt: formatTimestamp(user.UpdatedAt.Time),
 	}
 }
 
@@ -237,33 +234,37 @@ func formatDate(value *time.Time) *string {
 	return &formatted
 }
 
-func parseUserID(raw string) (uint64, error) {
+func formatTimestamp(value time.Time) string {
+	return value.UTC().Format(stdhttp.TimeFormat)
+}
+
+func parseUserID(raw string) (int64, error) {
 	id, err := strconv.ParseUint(raw, 10, 64)
-	if err != nil {
-		return 0, errs.NewValidation("invalid user id", map[string]string{
+	if err != nil || id == 0 || id > math.MaxInt64 {
+		return 0, errs.NewInvalidArgument("invalid user id", map[string]string{
 			"id": "id must be an unsigned integer",
 		})
 	}
-	return id, nil
+	return int64(id), nil
 }
 
-func parseIntQuery(c echo.Context, name string) (int, error) {
-	value := strings.TrimSpace(c.QueryParam(name))
+func parseIntQuery(r *stdhttp.Request, name string) (int, error) {
+	value := strings.TrimSpace(r.URL.Query().Get(name))
 	if value == "" {
 		return 0, nil
 	}
 
 	parsed, err := strconv.Atoi(value)
 	if err != nil {
-		return 0, errs.NewValidation("invalid query parameter", map[string]string{
+		return 0, errs.NewInvalidArgument("invalid query parameter", map[string]string{
 			name: name + " must be an integer",
 		})
 	}
 	return parsed, nil
 }
 
-func optionalQuery(c echo.Context, name string) *string {
-	value := strings.TrimSpace(c.QueryParam(name))
+func optionalQuery(r *stdhttp.Request, name string) *string {
+	value := strings.TrimSpace(r.URL.Query().Get(name))
 	if value == "" {
 		return nil
 	}
@@ -277,10 +278,10 @@ func translateValidationError(err error) error {
 		for _, item := range validationErrors {
 			fields[item.Field()] = validationMessage(item)
 		}
-		return errs.NewValidation("validation failed", fields)
+		return errs.NewInvalidArgument("validation failed", fields)
 	}
 
-	return errs.NewValidation("validation failed", nil)
+	return errs.NewInvalidArgument("validation failed", nil)
 }
 
 func validationMessage(fieldError validator.FieldError) string {
