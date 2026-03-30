@@ -15,6 +15,8 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
+// NewHandler 创建 HTTP 路由处理器.
+// 配置中间件、路由和文档路由.
 func NewHandler(cfg *config.Config, logger *slog.Logger, userService *service.UserService) stdhttp.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -36,10 +38,12 @@ func NewHandler(cfg *config.Config, logger *slog.Logger, userService *service.Us
 	return r
 }
 
+// registerHealthRoutes 注册健康检查路由.
 func registerHealthRoutes(r chi.Router, logger *slog.Logger) {
 	r.Method(stdhttp.MethodGet, "/healthz", wrap(logger, healthzHandler))
 }
 
+// registerDocsRoutes 注册 API 文档路由.
 func registerDocsRoutes(r chi.Router, logger *slog.Logger) {
 	r.Method(stdhttp.MethodGet, "/swagger/swagger.json", wrap(logger, func(w stdhttp.ResponseWriter, r *stdhttp.Request) error {
 		doc, err := swag.ReadDoc()
@@ -52,6 +56,8 @@ func registerDocsRoutes(r chi.Router, logger *slog.Logger) {
 	r.Handle("/swagger/*", httpSwagger.Handler(httpSwagger.URL("/swagger/swagger.json")))
 }
 
+// registerUserRoutes 注册用户 API 路由.
+// 配置 /api/v1/users 下的 CRUD 路由.
 func registerUserRoutes(r chi.Router, logger *slog.Logger, handler *UserHandler) {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Route("/users", func(r chi.Router) {
@@ -65,7 +71,8 @@ func registerUserRoutes(r chi.Router, logger *slog.Logger, handler *UserHandler)
 	})
 }
 
-// healthzHandler godoc
+// healthzHandler 健康检查处理器.
+// 返回服务健康状态.
 // @Summary Health check
 // @Description Returns the service health status.
 // @Tags system

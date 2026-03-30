@@ -1,30 +1,30 @@
 package httpapi
 
-// HealthResponse describes the health check payload.
+// HealthResponse 健康检查响应.
 type HealthResponse struct {
 	Status string `json:"status" example:"ok"`
 }
 
-// ErrorDetail describes a normalized API error body.
+// ErrorDetail 错误详情.
 type ErrorDetail struct {
 	Code    string            `json:"code" example:"validation_error"`
 	Message string            `json:"message" example:"validation failed"`
 	Fields  map[string]string `json:"fields,omitempty" swaggertype:"object,string"`
 }
 
-// ErrorEnvelope wraps an API error response.
+// ErrorEnvelope 错误响应包装器.
 type ErrorEnvelope struct {
 	Error ErrorDetail `json:"error"`
 }
 
-// Pagination describes paging metadata for list responses.
+// Pagination 分页信息.
 type Pagination struct {
 	Page     int   `json:"page" example:"1"`
 	PageSize int   `json:"page_size" example:"20"`
 	Total    int64 `json:"total" example:"100"`
 }
 
-// UserResponse describes a user returned by the API.
+// UserResponse 用户响应结构.
 type UserResponse struct {
 	ID        int64   `json:"id" example:"1"`
 	UID       string  `json:"uid" example:"user-001"`
@@ -37,12 +37,12 @@ type UserResponse struct {
 	UpdatedAt string  `json:"updated_at" example:"Mon, 02 Jan 2006 15:04:05 GMT"`
 }
 
-// UserDetailEnvelope wraps a single user response.
+// UserDetailEnvelope 单个用户响应包装器.
 type UserDetailEnvelope struct {
 	Data UserResponse `json:"data"`
 }
 
-// UserListEnvelope wraps a paginated users response.
+// UserListEnvelope 用户列表响应包装器.
 type UserListEnvelope struct {
 	Data       []UserResponse `json:"data"`
 	Pagination Pagination     `json:"pagination"`

@@ -17,13 +17,14 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-// UserHandler handles user CRUD requests.
+// UserHandler 处理用户相关的 HTTP 请求.
 type UserHandler struct {
 	service  *service.UserService
 	validate *validator.Validate
 }
 
-// NewUserHandler creates a user handler.
+// NewUserHandler 创建用户处理器.
+// 用于处理用户的 CRUD 请求.
 func NewUserHandler(service *service.UserService) *UserHandler {
 	return &UserHandler{
 		service:  service,
@@ -31,7 +32,7 @@ func NewUserHandler(service *service.UserService) *UserHandler {
 	}
 }
 
-// Create godoc
+// Create 创建新用户.
 // @Summary Create user
 // @Description Create a new user record.
 // @Tags users
@@ -61,7 +62,7 @@ func (h *UserHandler) Create(w stdhttp.ResponseWriter, r *stdhttp.Request) error
 	return nil
 }
 
-// GetByID godoc
+// GetByID 根据 ID 获取用户.
 // @Summary Get user by ID
 // @Description Fetch a single user by its numeric identifier.
 // @Tags users
@@ -87,7 +88,7 @@ func (h *UserHandler) GetByID(w stdhttp.ResponseWriter, r *stdhttp.Request) erro
 	return nil
 }
 
-// List godoc
+// List 获取用户列表.
 // @Summary List users
 // @Description List users with optional email and name filters.
 // @Tags users
@@ -136,7 +137,7 @@ func (h *UserHandler) List(w stdhttp.ResponseWriter, r *stdhttp.Request) error {
 	return nil
 }
 
-// Update godoc
+// Update 更新用户.
 // @Summary Update user
 // @Description Replace user fields by ID.
 // @Tags users
@@ -174,7 +175,7 @@ func (h *UserHandler) Update(w stdhttp.ResponseWriter, r *stdhttp.Request) error
 	return nil
 }
 
-// Delete godoc
+// Delete 删除用户.
 // @Summary Delete user
 // @Description Delete a user by ID.
 // @Tags users
@@ -199,6 +200,7 @@ func (h *UserHandler) Delete(w stdhttp.ResponseWriter, r *stdhttp.Request) error
 	return nil
 }
 
+// decodeJSON 解码 JSON 请求体.
 func decodeJSON(r *stdhttp.Request, dest any) error {
 	defer r.Body.Close()
 
@@ -211,6 +213,7 @@ func decodeJSON(r *stdhttp.Request, dest any) error {
 	return nil
 }
 
+// newUserResponse 转换为用户响应结构.
 func newUserResponse(user query.User) UserResponse {
 	return UserResponse{
 		ID:        user.ID,
@@ -225,6 +228,7 @@ func newUserResponse(user query.User) UserResponse {
 	}
 }
 
+// formatDate 格式化日期为 YYYY-MM-DD.
 func formatDate(value *time.Time) *string {
 	if value == nil {
 		return nil
@@ -234,10 +238,12 @@ func formatDate(value *time.Time) *string {
 	return &formatted
 }
 
+// formatTimestamp 格式化时间戳为 RFC 标准格式.
 func formatTimestamp(value time.Time) string {
 	return value.UTC().Format(stdhttp.TimeFormat)
 }
 
+// parseUserID 解析用户 ID 字符串为 int64.
 func parseUserID(raw string) (int64, error) {
 	id, err := strconv.ParseUint(raw, 10, 64)
 	if err != nil || id == 0 || id > math.MaxInt64 {
@@ -248,6 +254,7 @@ func parseUserID(raw string) (int64, error) {
 	return int64(id), nil
 }
 
+// parseIntQuery 解析整数类型的查询参数.
 func parseIntQuery(r *stdhttp.Request, name string) (int, error) {
 	value := strings.TrimSpace(r.URL.Query().Get(name))
 	if value == "" {
@@ -263,6 +270,7 @@ func parseIntQuery(r *stdhttp.Request, name string) (int, error) {
 	return parsed, nil
 }
 
+// optionalQuery 获取可选的字符串查询参数.
 func optionalQuery(r *stdhttp.Request, name string) *string {
 	value := strings.TrimSpace(r.URL.Query().Get(name))
 	if value == "" {
@@ -271,6 +279,7 @@ func optionalQuery(r *stdhttp.Request, name string) *string {
 	return &value
 }
 
+// translateValidationError 将验证错误转换为应用错误.
 func translateValidationError(err error) error {
 	var validationErrors validator.ValidationErrors
 	if errors.As(err, &validationErrors) {
@@ -284,6 +293,7 @@ func translateValidationError(err error) error {
 	return errs.NewInvalidArgument("validation failed", nil)
 }
 
+// validationMessage 获取验证错误的消息文本.
 func validationMessage(fieldError validator.FieldError) string {
 	switch fieldError.Tag() {
 	case "required":
