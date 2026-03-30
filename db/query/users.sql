@@ -1,12 +1,14 @@
 -- name: CreateUser :one
-INSERT INTO users (uid, name, email, used_name, company, birth)
+INSERT INTO users (uid, name, email, used_name, company, birth, created_at, updated_at)
 VALUES (
   sqlc.arg('uid'),
   sqlc.arg('name'),
   sqlc.narg('email')::text,
   sqlc.arg('used_name'),
   sqlc.arg('company'),
-  sqlc.narg('birth')::date
+  sqlc.narg('birth')::date,
+  NOW(),
+  NOW()
 )
 RETURNING id, uid, email, name, used_name, company, birth, created_at, updated_at;
 
