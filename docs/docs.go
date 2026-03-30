@@ -170,7 +170,7 @@ const docTemplate = `{
                 }
             },
             "put": {
-                "description": "Replace user fields by ID.",
+                "description": "Replace all mutable user fields by ID.",
                 "consumes": [
                     "application/json"
                 ],
@@ -180,7 +180,7 @@ const docTemplate = `{
                 "tags": [
                     "users"
                 ],
-                "summary": "Update user",
+                "summary": "Replace user",
                 "parameters": [
                     {
                         "type": "integer",
@@ -275,7 +275,7 @@ const docTemplate = `{
                 }
             },
             "patch": {
-                "description": "Replace user fields by ID.",
+                "description": "Partially update mutable user fields by ID.",
                 "consumes": [
                     "application/json"
                 ],
@@ -285,7 +285,7 @@ const docTemplate = `{
                 "tags": [
                     "users"
                 ],
-                "summary": "Update user",
+                "summary": "Patch user",
                 "parameters": [
                     {
                         "type": "integer",
@@ -295,12 +295,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Update user payload",
+                        "description": "Patch user payload",
                         "name": "payload",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/service.UpdateUserInput"
+                            "$ref": "#/definitions/httpapi.PatchUserRequest"
                         }
                     }
                 ],
@@ -410,6 +410,31 @@ const docTemplate = `{
                 "total": {
                     "type": "integer",
                     "example": 100
+                }
+            }
+        },
+        "httpapi.PatchUserRequest": {
+            "type": "object",
+            "properties": {
+                "birth": {
+                    "type": "string",
+                    "example": "1990-01-01"
+                },
+                "company": {
+                    "type": "string",
+                    "example": "ACME"
+                },
+                "email": {
+                    "type": "string",
+                    "example": "alice@example.com"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Alice"
+                },
+                "used_name": {
+                    "type": "string",
+                    "example": "Ali"
                 }
             }
         },

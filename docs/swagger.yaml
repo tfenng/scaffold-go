@@ -36,6 +36,24 @@ definitions:
         example: 100
         type: integer
     type: object
+  httpapi.PatchUserRequest:
+    properties:
+      birth:
+        example: "1990-01-01"
+        type: string
+      company:
+        example: ACME
+        type: string
+      email:
+        example: alice@example.com
+        type: string
+      name:
+        example: Alice
+        type: string
+      used_name:
+        example: Ali
+        type: string
+    type: object
   httpapi.UserDetailEnvelope:
     properties:
       data:
@@ -272,19 +290,19 @@ paths:
     patch:
       consumes:
       - application/json
-      description: Replace user fields by ID.
+      description: Partially update mutable user fields by ID.
       parameters:
       - description: User ID
         in: path
         name: id
         required: true
         type: integer
-      - description: Update user payload
+      - description: Patch user payload
         in: body
         name: payload
         required: true
         schema:
-          $ref: '#/definitions/service.UpdateUserInput'
+          $ref: '#/definitions/httpapi.PatchUserRequest'
       produces:
       - application/json
       responses:
@@ -308,13 +326,13 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/httpapi.ErrorEnvelope'
-      summary: Update user
+      summary: Patch user
       tags:
       - users
     put:
       consumes:
       - application/json
-      description: Replace user fields by ID.
+      description: Replace all mutable user fields by ID.
       parameters:
       - description: User ID
         in: path
@@ -350,7 +368,7 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/httpapi.ErrorEnvelope'
-      summary: Update user
+      summary: Replace user
       tags:
       - users
   /healthz:

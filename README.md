@@ -126,6 +126,26 @@ make migrate-down
 make sqlc
 ```
 
+## 架构与请求流
+
+启动入口：
+
+- `main.go` 负责加载配置、初始化日志、连接 PostgreSQL，并组装 `store -> service -> http handler`
+
+请求路径：
+
+1. `internal/http/router.go` 注册路由、中间件、Swagger 和 `users` API
+2. `internal/http/user_handler.go` 负责解析请求、校验输入、写出响应
+3. `internal/service/user_service.go` 负责业务规则、分页默认值、字段归一化、错误翻译
+4. `internal/db/store.go` 作为存储适配层，调用 `sqlc` 生成的方法
+5. `db/query/users.sql` 定义最终执行的 SQL
+
+错误处理：
+
+- Handler 返回 `error`
+- `internal/http/errors.go` 统一把应用错误转换为 HTTP 状态码和 JSON 错误响应
+- `internal/http/middleware.go` 记录 request id、状态码和耗时
+
 ## 在线 API 文档
 
 启动服务后，可访问：
@@ -138,6 +158,7 @@ Swagger 生成产物已提交到仓库：
 - `docs/docs.go`
 - `docs/swagger.json`
 - `docs/swagger.yaml`
+- `docs/API_CHANGELOG.md`
 
 如果修改了接口注释或请求/响应结构体，需要重新生成：
 
@@ -162,6 +183,60 @@ make swagger-check
 - `PUT /api/v1/users/{id}`
 - `PATCH /api/v1/users/{id}`
 - `DELETE /api/v1/users/{id}`
+
+更新语义：
+
+- `PUT /api/v1/users/{id}`: 全量更新可变字段，`name` 必填
+- `PATCH /api/v1/users/{id}`: 部分更新，只修改请求体中出现的字段
+- `PATCH` 中显式传入 `null` 可清空可空字段，例如 `email` 和 `birth`
+
+## 接口示例
+
+以 `PATCH /api/v1/users/{id}` 为例：
+
+请求：
+
+```http
+PATCH /api/v1/users/1
+Content-Type: application/json
+
+{
+  "company": "Example Co",
+  "email": null
+}
+```
+
+含义：
+
+- 仅更新 `company`
+- 将 `email` 清空为 `NULL`
+- 其他字段保持原值不变
+
+成功响应：
+
+```json
+{
+  "data": {
+    "id": 1,
+    "uid": "user-001",
+    "email": null,
+    "name": "Alice",
+    "used_name": "Ali",
+    "company": "Example Co",
+    "birth": "1990-01-01",
+    "created_at": "Mon, 02 Jan 2006 15:04:05 GMT",
+    "updated_at": "Mon, 02 Jan 2006 15:04:05 GMT"
+  }
+}
+```
+
+执行链路：
+
+1. `router.go` 将请求分发到 `UserHandler.Patch`
+2. `user_handler.go` 解码 JSON 并调用 `UserService.Patch`
+3. `user_service.go` 先读取当前用户，再将补丁字段合并到现有数据
+4. `store.go` 调用 `sqlc` 生成的 `UpdateUser`
+5. `users.sql` 执行 `UPDATE users ... RETURNING ...`
 
 ## 测试与构建
 
@@ -189,11 +264,11 @@ make build
 
 ```bash
 ./build.sh
-./runD.sh
+./run.sh
 ```
 
 说明：
 
-- `runD.sh` 默认读取 `.env.dev`
+- `run.sh` 默认读取 `.env.dev`
 - 如果 `DB_DSN` 中使用了 `localhost` 或 `127.0.0.1`，脚本会自动替换为 `host.docker.internal`
 - Linux 下会自动增加 `host.docker.internal:host-gateway` 映射，方便容器访问宿主机 PostgreSQL

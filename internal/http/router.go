@@ -11,8 +11,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-	"github.com/swaggo/swag"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
+	"github.com/swaggo/swag"
 )
 
 // NewHandler 创建 HTTP 路由处理器.
@@ -22,10 +22,10 @@ func NewHandler(cfg *config.Config, logger *slog.Logger, userService *service.Us
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   cfg.CORSAllowOrigins,
-		AllowedMethods:   []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With"},
-		AllowCredentials: true,
+		AllowedOrigins:     cfg.CORSAllowOrigins,
+		AllowedMethods:     []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With"},
+		AllowCredentials:   true,
 		OptionsPassthrough: true,
 	}))
 	r.Use(PreflightNoContent)
@@ -65,7 +65,7 @@ func registerUserRoutes(r chi.Router, logger *slog.Logger, handler *UserHandler)
 			r.Method(stdhttp.MethodGet, "/", wrap(logger, handler.List))
 			r.Method(stdhttp.MethodGet, "/{id}", wrap(logger, handler.GetByID))
 			r.Method(stdhttp.MethodPut, "/{id}", wrap(logger, handler.Update))
-			r.Method(stdhttp.MethodPatch, "/{id}", wrap(logger, handler.Update))
+			r.Method(stdhttp.MethodPatch, "/{id}", wrap(logger, handler.Patch))
 			r.Method(stdhttp.MethodDelete, "/{id}", wrap(logger, handler.Delete))
 		})
 	})

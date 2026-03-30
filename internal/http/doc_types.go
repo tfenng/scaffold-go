@@ -37,6 +37,15 @@ type UserResponse struct {
 	UpdatedAt string  `json:"updated_at" example:"Mon, 02 Jan 2006 15:04:05 GMT"`
 }
 
+// PatchUserRequest PATCH 用户请求结构.
+type PatchUserRequest struct {
+	Name     *string `json:"name,omitempty" example:"Alice"`
+	Email    *string `json:"email,omitempty" example:"alice@example.com"`
+	UsedName *string `json:"used_name,omitempty" example:"Ali"`
+	Company  *string `json:"company,omitempty" example:"ACME"`
+	Birth    *string `json:"birth,omitempty" example:"1990-01-01"`
+}
+
 // UserDetailEnvelope 单个用户响应包装器.
 type UserDetailEnvelope struct {
 	Data UserResponse `json:"data"`

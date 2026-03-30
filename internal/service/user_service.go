@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net/mail"
 	"strings"
 	"time"
 
@@ -37,6 +39,35 @@ type UpdateUserInput struct {
 	UsedName string  `json:"used_name" validate:"omitempty,max=255" example:"Ali"`
 	Company  string  `json:"company" validate:"omitempty,max=255" example:"ACME"`
 	Birth    *string `json:"birth" validate:"omitempty,datetime=2006-01-02" example:"1990-01-01"`
+}
+
+type OptionalString struct {
+	Set   bool
+	Value *string
+}
+
+func (o *OptionalString) UnmarshalJSON(data []byte) error {
+	o.Set = true
+	if string(data) == "null" {
+		o.Value = nil
+		return nil
+	}
+
+	var value string
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+
+	o.Value = &value
+	return nil
+}
+
+type PatchUserInput struct {
+	Name     OptionalString `json:"name" example:"Alice"`
+	Email    OptionalString `json:"email" example:"alice@example.com"`
+	UsedName OptionalString `json:"used_name" example:"Ali"`
+	Company  OptionalString `json:"company" example:"ACME"`
+	Birth    OptionalString `json:"birth" example:"1990-01-01"`
 }
 
 type ListUsersInput struct {
@@ -178,6 +209,93 @@ func (s *UserService) Update(ctx context.Context, id int64, input UpdateUserInpu
 	return &user, nil
 }
 
+func (s *UserService) Patch(ctx context.Context, id int64, input PatchUserInput) (*query.User, error) {
+	current, err := s.store.GetUserByID(ctx, id)
+	if err != nil {
+		return nil, translateStoreError(err)
+	}
+
+	params := query.UpdateUserParams{
+		ID:       id,
+		Name:     current.Name,
+		Email:    nullableText(current.Email),
+		UsedName: current.UsedName,
+		Company:  current.Company,
+		Birth:    nullableDate(current.Birth),
+	}
+
+	if input.Name.Set {
+		name := normalizeRequiredString(input.Name.Value)
+		if name == "" {
+			return nil, errs.NewInvalidArgument("name is required", map[string]string{
+				"name": "name is required",
+			})
+		}
+		if len(name) > 255 {
+			return nil, errs.NewInvalidArgument("validation failed", map[string]string{
+				"name": "is too long",
+			})
+		}
+		params.Name = name
+	}
+
+	if input.Email.Set {
+		email := normalizeOptionalString(input.Email.Value)
+		if email != nil {
+			if len(*email) > 255 {
+				return nil, errs.NewInvalidArgument("validation failed", map[string]string{
+					"email": "is too long",
+				})
+			}
+			if _, err := mail.ParseAddress(*email); err != nil {
+				return nil, errs.NewInvalidArgument("validation failed", map[string]string{
+					"email": "must be a valid email",
+				})
+			}
+		}
+		params.Email = nullableText(email)
+	}
+
+	if input.UsedName.Set {
+		usedName := normalizeRequiredString(input.UsedName.Value)
+		if len(usedName) > 255 {
+			return nil, errs.NewInvalidArgument("validation failed", map[string]string{
+				"used_name": "is too long",
+			})
+		}
+		params.UsedName = usedName
+	}
+
+	if input.Company.Set {
+		company := normalizeRequiredString(input.Company.Value)
+		if len(company) > 255 {
+			return nil, errs.NewInvalidArgument("validation failed", map[string]string{
+				"company": "is too long",
+			})
+		}
+		params.Company = company
+	}
+
+	if input.Birth.Set {
+		birth, err := parseBirth(input.Birth.Value)
+		if err != nil {
+			return nil, err
+		}
+		params.Birth = nullableDate(birth)
+	}
+
+	if !input.Name.Set && !input.Email.Set && !input.UsedName.Set && !input.Company.Set && !input.Birth.Set {
+		return &current, nil
+	}
+
+	user, err := s.store.UpdateUser(ctx, params)
+	if err != nil {
+		return nil, translateStoreError(err)
+	}
+
+	return &user, nil
+}
+
 func (s *UserService) Delete(ctx context.Context, id int64) error {
 	rows, err := s.store.DeleteUser(ctx, id)
 	if err != nil {
@@ -207,6 +325,13 @@ func parseBirth(value *string) (*time.Time, error) {
 	}
 
 	return &parsed, nil
+}
+
+func normalizeRequiredString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return strings.TrimSpace(*value)
 }
 
 func normalizeOptionalString(value *string) *string {

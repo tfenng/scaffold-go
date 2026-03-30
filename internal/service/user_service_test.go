@@ -17,17 +17,19 @@ import (
 
 type stubUserStore struct {
 	createFn func(context.Context, query.CreateUserParams) (query.User, error)
+	getFn    func(context.Context, int64) (query.User, error)
 	listFn   func(context.Context, query.ListUsersParams) ([]query.User, error)
 	countFn  func(context.Context, query.CountUsersParams) (int64, error)
 	updateFn func(context.Context, query.UpdateUserParams) (query.User, error)
+	deleteFn func(context.Context, int64) (int64, error)
 }
 
 func (s stubUserStore) CreateUser(ctx context.Context, arg query.CreateUserParams) (query.User, error) {
 	return s.createFn(ctx, arg)
 }
 
-func (s stubUserStore) GetUserByID(context.Context, int64) (query.User, error) {
-	return query.User{}, nil
+func (s stubUserStore) GetUserByID(ctx context.Context, id int64) (query.User, error) {
+	return s.getFn(ctx, id)
 }
 
 func (s stubUserStore) ListUsers(ctx context.Context, arg query.ListUsersParams) ([]query.User, error) {
@@ -42,8 +44,8 @@ func (s stubUserStore) UpdateUser(ctx context.Context, arg query.UpdateUserParam
 	return s.updateFn(ctx, arg)
 }
 
-func (s stubUserStore) DeleteUser(context.Context, int64) (int64, error) {
-	return 1, nil
+func (s stubUserStore) DeleteUser(ctx context.Context, id int64) (int64, error) {
+	return s.deleteFn(ctx, id)
 }
 
 func TestCreateNormalizesOptionalFields(t *testing.T) {
@@ -55,6 +57,9 @@ func TestCreateNormalizesOptionalFields(t *testing.T) {
 			captured = arg
 			return query.User{}, nil
 		},
+		getFn: func(context.Context, int64) (query.User, error) {
+			return query.User{}, nil
+		},
 		listFn: func(context.Context, query.ListUsersParams) ([]query.User, error) {
 			return nil, nil
 		},
@@ -63,6 +68,9 @@ func TestCreateNormalizesOptionalFields(t *testing.T) {
 		},
 		updateFn: func(context.Context, query.UpdateUserParams) (query.User, error) {
 			return query.User{}, nil
+		},
+		deleteFn: func(context.Context, int64) (int64, error) {
+			return 1, nil
 		},
 	})
 
@@ -95,6 +103,9 @@ func TestCreateRejectsInvalidBirth(t *testing.T) {
 		createFn: func(_ context.Context, arg query.CreateUserParams) (query.User, error) {
 			return query.User{}, nil
 		},
+		getFn: func(context.Context, int64) (query.User, error) {
+			return query.User{}, nil
+		},
 		listFn: func(context.Context, query.ListUsersParams) ([]query.User, error) {
 			return nil, nil
 		},
@@ -103,6 +114,9 @@ func TestCreateRejectsInvalidBirth(t *testing.T) {
 		},
 		updateFn: func(context.Context, query.UpdateUserParams) (query.User, error) {
 			return query.User{}, nil
+		},
+		deleteFn: func(context.Context, int64) (int64, error) {
+			return 1, nil
 		},
 	})
 
@@ -124,6 +138,9 @@ func TestListAppliesPageDefaultsAndCapsSize(t *testing.T) {
 		createFn: func(_ context.Context, arg query.CreateUserParams) (query.User, error) {
 			return query.User{}, nil
 		},
+		getFn: func(context.Context, int64) (query.User, error) {
+			return query.User{}, nil
+		},
 		listFn: func(_ context.Context, arg query.ListUsersParams) ([]query.User, error) {
 			captured = arg
 			return []query.User{{
@@ -140,6 +157,9 @@ func TestListAppliesPageDefaultsAndCapsSize(t *testing.T) {
 		},
 		updateFn: func(context.Context, query.UpdateUserParams) (query.User, error) {
 			return query.User{}, nil
+		},
+		deleteFn: func(context.Context, int64) (int64, error) {
+			return 1, nil
 		},
 	})
 
@@ -185,4 +205,124 @@ func TestTranslateStoreErrorWrapsUnknownAsInternal(t *testing.T) {
 
 	require.Error(t, err)
 	require.ErrorIs(t, err, errs.ErrInternal)
+}
+
+func TestPatchPreservesOmittedFieldsAndClearsNullableOnNull(t *testing.T) {
+	t.Parallel()
+
+	email := "alice@example.com"
+	birthTime := time.Date(2024, 10, 1, 0, 0, 0, 0, time.UTC)
+
+	var captured query.UpdateUserParams
+	svc := NewUserService(stubUserStore{
+		createFn: func(_ context.Context, arg query.CreateUserParams) (query.User, error) {
+			return query.User{}, nil
+		},
+		getFn: func(context.Context, int64) (query.User, error) {
+			return query.User{
+				ID:       7,
+				Name:     "Alice",
+				Email:    &email,
+				UsedName: "Ali",
+				Company:  "ACME",
+				Birth:    &birthTime,
+			}, nil
+		},
+		listFn: func(context.Context, query.ListUsersParams) ([]query.User, error) {
+			return nil, nil
+		},
+		countFn: func(context.Context, query.CountUsersParams) (int64, error) {
+			return 0, nil
+		},
+		updateFn: func(_ context.Context, arg query.UpdateUserParams) (query.User, error) {
+			captured = arg
+			return query.User{ID: arg.ID, Name: arg.Name, UsedName: arg.UsedName, Company: arg.Company}, nil
+		},
+		deleteFn: func(context.Context, int64) (int64, error) {
+			return 1, nil
+		},
+	})
+
+	company := "  Example Co  "
+	result, err := svc.Patch(context.Background(), 7, PatchUserInput{
+		Company: OptionalString{Set: true, Value: &company},
+		Email:   OptionalString{Set: true, Value: nil},
+		Birth:   OptionalString{Set: true, Value: nil},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, int64(7), captured.ID)
+	require.Equal(t, "Alice", captured.Name)
+	require.Equal(t, "Ali", captured.UsedName)
+	require.Equal(t, "Example Co", captured.Company)
+	require.False(t, captured.Email.Valid)
+	require.False(t, captured.Birth.Valid)
+}
+
+func TestPatchRejectsBlankNameWhenProvided(t *testing.T) {
+	t.Parallel()
+
+	name := "   "
+	svc := NewUserService(stubUserStore{
+		createFn: func(_ context.Context, arg query.CreateUserParams) (query.User, error) {
+			return query.User{}, nil
+		},
+		getFn: func(context.Context, int64) (query.User, error) {
+			return query.User{Name: "Alice"}, nil
+		},
+		listFn: func(context.Context, query.ListUsersParams) ([]query.User, error) {
+			return nil, nil
+		},
+		countFn: func(context.Context, query.CountUsersParams) (int64, error) {
+			return 0, nil
+		},
+		updateFn: func(context.Context, query.UpdateUserParams) (query.User, error) {
+			return query.User{}, nil
+		},
+		deleteFn: func(context.Context, int64) (int64, error) {
+			return 1, nil
+		},
+	})
+
+	_, err := svc.Patch(context.Background(), 1, PatchUserInput{
+		Name: OptionalString{Set: true, Value: &name},
+	})
+
+	require.Error(t, err)
+	require.ErrorIs(t, err, errs.ErrInvalidArgument)
+}
+
+func TestPatchReturnsCurrentUserWhenPayloadHasNoChanges(t *testing.T) {
+	t.Parallel()
+
+	current := query.User{ID: 9, Name: "Alice"}
+	updateCalled := false
+	svc := NewUserService(stubUserStore{
+		createFn: func(_ context.Context, arg query.CreateUserParams) (query.User, error) {
+			return query.User{}, nil
+		},
+		getFn: func(context.Context, int64) (query.User, error) {
+			return current, nil
+		},
+		listFn: func(context.Context, query.ListUsersParams) ([]query.User, error) {
+			return nil, nil
+		},
+		countFn: func(context.Context, query.CountUsersParams) (int64, error) {
+			return 0, nil
+		},
+		updateFn: func(context.Context, query.UpdateUserParams) (query.User, error) {
+			updateCalled = true
+			return query.User{}, nil
+		},
+		deleteFn: func(context.Context, int64) (int64, error) {
+			return 1, nil
+		},
+	})
+
+	result, err := svc.Patch(context.Background(), 9, PatchUserInput{})
+
+	require.NoError(t, err)
+	require.Equal(t, current, *result)
+	require.False(t, updateCalled)
 }

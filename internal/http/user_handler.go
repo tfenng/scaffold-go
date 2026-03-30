@@ -138,8 +138,8 @@ func (h *UserHandler) List(w stdhttp.ResponseWriter, r *stdhttp.Request) error {
 }
 
 // Update 更新用户.
-// @Summary Update user
-// @Description Replace user fields by ID.
+// @Summary Replace user
+// @Description Replace all mutable user fields by ID.
 // @Tags users
 // @Accept json
 // @Produce json
@@ -151,7 +151,6 @@ func (h *UserHandler) List(w stdhttp.ResponseWriter, r *stdhttp.Request) error {
 // @Failure 409 {object} ErrorEnvelope
 // @Failure 500 {object} ErrorEnvelope
 // @Router /api/v1/users/{id} [put]
-// @Router /api/v1/users/{id} [patch]
 func (h *UserHandler) Update(w stdhttp.ResponseWriter, r *stdhttp.Request) error {
 	id, err := parseUserID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -167,6 +166,40 @@ func (h *UserHandler) Update(w stdhttp.ResponseWriter, r *stdhttp.Request) error
 	}
 
 	user, err := h.service.Update(r.Context(), id, req)
+	if err != nil {
+		return err
+	}
+
+	writeJSON(w, stdhttp.StatusOK, UserDetailEnvelope{Data: newUserResponse(*user)})
+	return nil
+}
+
+// Patch 部分更新用户.
+// @Summary Patch user
+// @Description Partially update mutable user fields by ID.
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param id path int true "User ID"
+// @Param payload body PatchUserRequest true "Patch user payload"
+// @Success 200 {object} UserDetailEnvelope
+// @Failure 400 {object} ErrorEnvelope
+// @Failure 404 {object} ErrorEnvelope
+// @Failure 409 {object} ErrorEnvelope
+// @Failure 500 {object} ErrorEnvelope
+// @Router /api/v1/users/{id} [patch]
+func (h *UserHandler) Patch(w stdhttp.ResponseWriter, r *stdhttp.Request) error {
+	id, err := parseUserID(chi.URLParam(r, "id"))
+	if err != nil {
+		return err
+	}
+
+	var req service.PatchUserInput
+	if err := decodeJSON(r, &req); err != nil {
+		return err
+	}
+
+	user, err := h.service.Patch(r.Context(), id, req)
 	if err != nil {
 		return err
 	}
