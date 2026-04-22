@@ -61,7 +61,7 @@ make dev
 ```bash
 export APP_ENV=dev
 export HTTP_PORT=8080
-export DB_DSN='postgres://postgres:postgres@127.0.0.1:5432/scaffold_api?sslmode=disable'
+export DB_DSN='postgres://tony:tony@127.0.0.1:5432/tony?sslmode=disable'
 go run .
 ```
 
