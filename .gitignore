@@ -2,3 +2,23 @@ configs/config.yaml
 scaffold-api
 .env.dev
 .env.production
+
+# Local Turso / SQLite database files
+/data/
+*.db
+*.db-wal
+*.db-shm
+
+# Single binary output
+/bin/
+
+# Embedded frontend build output (keep the placeholder)
+internal/webui/dist/*
+!internal/webui/dist/.gitkeep
+
+# Accidental Node tooling at the repo root
+/node_modules/
+
+# Added by cargo
+
+/target

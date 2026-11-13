@@ -7,55 +7,51 @@ package query
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const countUsers = `-- name: CountUsers :one
 SELECT COUNT(1)
 FROM users
-WHERE ($1::text IS NULL OR email = $1::text)
-  AND ($2::text IS NULL OR name ILIKE '%' || $2::text || '%')
+WHERE (CAST(?1 AS TEXT) IS NULL OR email = CAST(?1 AS TEXT))
+  AND (CAST(?2 AS TEXT) IS NULL OR name LIKE '%' || CAST(?2 AS TEXT) || '%')
 `
 
 type CountUsersParams struct {
-	Email    pgtype.Text `json:"email"`
-	NameLike pgtype.Text `json:"name_like"`
+	Email    *string `json:"email"`
+	NameLike *string `json:"name_like"`
 }
 
 func (q *Queries) CountUsers(ctx context.Context, arg CountUsersParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countUsers, arg.Email, arg.NameLike)
+	row := q.db.QueryRowContext(ctx, countUsers, arg.Email, arg.NameLike)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
 }
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (uid, name, email, used_name, company, birth, created_at, updated_at)
+INSERT INTO users (uid, name, email, used_name, company, birth)
 VALUES (
-  $1,
-  $2,
-  $3::text,
-  $4,
-  $5,
-  $6::date,
-  NOW(),
-  NOW()
+  ?1,
+  ?2,
+  ?3,
+  ?4,
+  ?5,
+  ?6
 )
 RETURNING id, uid, email, name, used_name, company, birth, created_at, updated_at
 `
 
 type CreateUserParams struct {
-	Uid      string      `json:"uid"`
-	Name     string      `json:"name"`
-	Email    pgtype.Text `json:"email"`
-	UsedName string      `json:"used_name"`
-	Company  string      `json:"company"`
-	Birth    pgtype.Date `json:"birth"`
+	Uid      string  `json:"uid"`
+	Name     string  `json:"name"`
+	Email    *string `json:"email"`
+	UsedName string  `json:"used_name"`
+	Company  string  `json:"company"`
+	Birth    *string `json:"birth"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser,
+	row := q.db.QueryRowContext(ctx, createUser,
 		arg.Uid,
 		arg.Name,
 		arg.Email,
@@ -80,25 +76,25 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 
 const deleteUser = `-- name: DeleteUser :execrows
 DELETE FROM users
-WHERE id = $1
+WHERE id = ?1
 `
 
 func (q *Queries) DeleteUser(ctx context.Context, id int64) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteUser, id)
+	result, err := q.db.ExecContext(ctx, deleteUser, id)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected(), nil
+	return result.RowsAffected()
 }
 
 const getUserByID = `-- name: GetUserByID :one
 SELECT id, uid, email, name, used_name, company, birth, created_at, updated_at
 FROM users
-WHERE id = $1
+WHERE id = ?1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
-	row := q.db.QueryRow(ctx, getUserByID, id)
+	row := q.db.QueryRowContext(ctx, getUserByID, id)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -117,21 +113,21 @@ func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
 const listUsers = `-- name: ListUsers :many
 SELECT id, uid, email, name, used_name, company, birth, created_at, updated_at
 FROM users
-WHERE ($1::text IS NULL OR email = $1::text)
-  AND ($2::text IS NULL OR name ILIKE '%' || $2::text || '%')
+WHERE (CAST(?1 AS TEXT) IS NULL OR email = CAST(?1 AS TEXT))
+  AND (CAST(?2 AS TEXT) IS NULL OR name LIKE '%' || CAST(?2 AS TEXT) || '%')
 ORDER BY created_at DESC, id DESC
-LIMIT $4 OFFSET $3
+LIMIT ?4 OFFSET ?3
 `
 
 type ListUsersParams struct {
-	Email    pgtype.Text `json:"email"`
-	NameLike pgtype.Text `json:"name_like"`
-	Offset   int32       `json:"offset"`
-	Limit    int32       `json:"limit"`
+	Email    *string `json:"email"`
+	NameLike *string `json:"name_like"`
+	Offset   int64   `json:"offset"`
+	Limit    int64   `json:"limit"`
 }
 
 func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error) {
-	rows, err := q.db.Query(ctx, listUsers,
+	rows, err := q.db.QueryContext(ctx, listUsers,
 		arg.Email,
 		arg.NameLike,
 		arg.Offset,
@@ -141,7 +137,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 		return nil, err
 	}
 	defer rows.Close()
-	var items []User
+	items := []User{}
 	for rows.Next() {
 		var i User
 		if err := rows.Scan(
@@ -159,6 +155,9 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -167,27 +166,27 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 
 const updateUser = `-- name: UpdateUser :one
 UPDATE users
-SET name = $1,
-    email = $2::text,
-    used_name = $3,
-    company = $4,
-    birth = $5::date,
-    updated_at = NOW()
-WHERE id = $6
+SET name = ?1,
+    email = ?2,
+    used_name = ?3,
+    company = ?4,
+    birth = ?5,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+WHERE id = ?6
 RETURNING id, uid, email, name, used_name, company, birth, created_at, updated_at
 `
 
 type UpdateUserParams struct {
-	Name     string      `json:"name"`
-	Email    pgtype.Text `json:"email"`
-	UsedName string      `json:"used_name"`
-	Company  string      `json:"company"`
-	Birth    pgtype.Date `json:"birth"`
-	ID       int64       `json:"id"`
+	Name     string  `json:"name"`
+	Email    *string `json:"email"`
+	UsedName string  `json:"used_name"`
+	Company  string  `json:"company"`
+	Birth    *string `json:"birth"`
+	ID       int64   `json:"id"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, updateUser,
+	row := q.db.QueryRowContext(ctx, updateUser,
 		arg.Name,
 		arg.Email,
 		arg.UsedName,

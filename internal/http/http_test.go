@@ -9,13 +9,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"scaffold-api/internal/config"
 	"scaffold-api/internal/db/query"
 	"scaffold-api/internal/service"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/require"
 )
 
@@ -60,7 +58,7 @@ func newTestHandler(store service.UserStore) http.Handler {
 		AppEnv:           "test",
 		HTTPHost:         "127.0.0.1",
 		HTTPPort:         8080,
-		DBDSN:            "postgres://test:test@localhost:5432/test?sslmode=disable",
+		DBPath:           ":memory:",
 		LogLevel:         "info",
 		CORSAllowOrigins: []string{"http://localhost:3000", "http://127.0.0.1:3000"},
 	}
@@ -129,48 +127,35 @@ func TestPatchUserPartiallyUpdatesAndClearsNullableFields(t *testing.T) {
 	t.Parallel()
 
 	currentEmail := "alice@example.com"
-	currentBirth := time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC)
-	now := time.Date(2026, 3, 29, 12, 0, 0, 0, time.UTC)
+	currentBirth := "1990-01-01"
 
 	var captured query.UpdateUserParams
 	handler := newTestHandler(stubUserStore{
 		getFn: func(context.Context, int64) (query.User, error) {
 			return query.User{
-				ID:       1,
-				Uid:      "user-001",
-				Email:    &currentEmail,
-				Name:     "Alice",
-				UsedName: "Ali",
-				Company:  "ACME",
-				Birth:    &currentBirth,
-				CreatedAt: pgtype.Timestamptz{
-					Time:  now,
-					Valid: true,
-				},
-				UpdatedAt: pgtype.Timestamptz{
-					Time:  now,
-					Valid: true,
-				},
+				ID:        1,
+				Uid:       "user-001",
+				Email:     &currentEmail,
+				Name:      "Alice",
+				UsedName:  "Ali",
+				Company:   "ACME",
+				Birth:     &currentBirth,
+				CreatedAt: "2026-03-29T12:00:00Z",
+				UpdatedAt: "2026-03-29T12:00:00Z",
 			}, nil
 		},
 		updateFn: func(_ context.Context, arg query.UpdateUserParams) (query.User, error) {
 			captured = arg
 			return query.User{
-				ID:       1,
-				Uid:      "user-001",
-				Email:    nil,
-				Name:     arg.Name,
-				UsedName: arg.UsedName,
-				Company:  arg.Company,
-				Birth:    &currentBirth,
-				CreatedAt: pgtype.Timestamptz{
-					Time:  now,
-					Valid: true,
-				},
-				UpdatedAt: pgtype.Timestamptz{
-					Time:  now,
-					Valid: true,
-				},
+				ID:        1,
+				Uid:       "user-001",
+				Email:     nil,
+				Name:      arg.Name,
+				UsedName:  arg.UsedName,
+				Company:   arg.Company,
+				Birth:     &currentBirth,
+				CreatedAt: "2026-03-29T12:00:00Z",
+				UpdatedAt: "2026-03-29T12:00:00Z",
 			}, nil
 		},
 	})
@@ -185,8 +170,8 @@ func TestPatchUserPartiallyUpdatesAndClearsNullableFields(t *testing.T) {
 	require.Equal(t, "Alice", captured.Name)
 	require.Equal(t, "Ali", captured.UsedName)
 	require.Equal(t, "Example Co", captured.Company)
-	require.False(t, captured.Email.Valid)
-	require.True(t, captured.Birth.Valid)
+	require.Nil(t, captured.Email)
+	require.NotNil(t, captured.Birth)
 
 	var body UserDetailEnvelope
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))

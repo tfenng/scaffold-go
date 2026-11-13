@@ -7,6 +7,7 @@ import (
 	_ "scaffold-api/docs"
 	"scaffold-api/internal/config"
 	"scaffold-api/internal/service"
+	"scaffold-api/internal/webui"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -34,6 +35,7 @@ func NewHandler(cfg *config.Config, logger *slog.Logger, userService *service.Us
 	registerDocsRoutes(r, logger)
 	registerHealthRoutes(r, logger)
 	registerUserRoutes(r, logger, NewUserHandler(userService))
+	registerStaticRoutes(r)
 
 	return r
 }
@@ -69,6 +71,12 @@ func registerUserRoutes(r chi.Router, logger *slog.Logger, handler *UserHandler)
 			r.Method(stdhttp.MethodDelete, "/{id}", wrap(logger, handler.Delete))
 		})
 	})
+}
+
+// registerStaticRoutes 托管内嵌的前端静态资源.
+// 未匹配到 API / 文档 / 健康检查的请求会回落到前端产物.
+func registerStaticRoutes(r chi.Router) {
+	r.Handle("/*", webui.Handler())
 }
 
 // healthzHandler 健康检查处理器.

@@ -7,7 +7,6 @@ import (
 	stdhttp "net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"scaffold-api/internal/db/query"
 	"scaffold-api/internal/errs"
@@ -255,25 +254,10 @@ func newUserResponse(user query.User) UserResponse {
 		Name:      user.Name,
 		UsedName:  user.UsedName,
 		Company:   user.Company,
-		Birth:     formatDate(user.Birth),
-		CreatedAt: formatTimestamp(user.CreatedAt.Time),
-		UpdatedAt: formatTimestamp(user.UpdatedAt.Time),
+		Birth:     user.Birth,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
 	}
-}
-
-// formatDate 格式化日期为 YYYY-MM-DD.
-func formatDate(value *time.Time) *string {
-	if value == nil {
-		return nil
-	}
-
-	formatted := value.Format("2006-01-02")
-	return &formatted
-}
-
-// formatTimestamp 格式化时间戳为 RFC 标准格式.
-func formatTimestamp(value time.Time) string {
-	return value.UTC().Format(stdhttp.TimeFormat)
 }
 
 // parseUserID 解析用户 ID 字符串为 int64.

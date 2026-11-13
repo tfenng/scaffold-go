@@ -2,17 +2,15 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"testing"
-	"time"
 
 	"scaffold-api/internal/db/query"
 	"scaffold-api/internal/errs"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/require"
+	turso "turso.tech/database/tursogo"
 )
 
 type stubUserStore struct {
@@ -88,12 +86,12 @@ func TestCreateNormalizesOptionalFields(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "user-001", captured.Uid)
 	require.Equal(t, "Alice", captured.Name)
-	require.True(t, captured.Email.Valid)
-	require.Equal(t, "alice@example.com", captured.Email.String)
+	require.True(t, captured.Email != nil)
+	require.Equal(t, "alice@example.com", *captured.Email)
 	require.Equal(t, "ali", captured.UsedName)
 	require.Equal(t, "ACME", captured.Company)
-	require.True(t, captured.Birth.Valid)
-	require.Equal(t, "2024-10-01", captured.Birth.Time.Format("2006-01-02"))
+	require.NotNil(t, captured.Birth)
+	require.Equal(t, "2024-10-01", *captured.Birth)
 }
 
 func TestCreateRejectsInvalidBirth(t *testing.T) {
@@ -144,12 +142,9 @@ func TestListAppliesPageDefaultsAndCapsSize(t *testing.T) {
 		listFn: func(_ context.Context, arg query.ListUsersParams) ([]query.User, error) {
 			captured = arg
 			return []query.User{{
-				ID:   1,
-				Name: "Alice",
-				CreatedAt: pgtype.Timestamptz{
-					Time:  time.Now(),
-					Valid: true,
-				},
+				ID:        1,
+				Name:      "Alice",
+				CreatedAt: "2026-03-29T12:00:00Z",
 			}}, nil
 		},
 		countFn: func(context.Context, query.CountUsersParams) (int64, error) {
@@ -173,16 +168,16 @@ func TestListAppliesPageDefaultsAndCapsSize(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, page.Page)
 	require.Equal(t, maxPageSize, page.PageSize)
-	require.Equal(t, int32(maxPageSize), captured.Limit)
-	require.Equal(t, int32(0), captured.Offset)
-	require.True(t, captured.NameLike.Valid)
-	require.Equal(t, "Alice", captured.NameLike.String)
+	require.Equal(t, int64(maxPageSize), captured.Limit)
+	require.Equal(t, int64(0), captured.Offset)
+	require.NotNil(t, captured.NameLike)
+	require.Equal(t, "Alice", *captured.NameLike)
 }
 
 func TestTranslateStoreErrorMapsNoRowsToNotFound(t *testing.T) {
 	t.Parallel()
 
-	err := translateStoreError(pgx.ErrNoRows)
+	err := translateStoreError(sql.ErrNoRows)
 
 	require.Error(t, err)
 	require.ErrorIs(t, err, errs.ErrNotFound)
@@ -191,7 +186,7 @@ func TestTranslateStoreErrorMapsNoRowsToNotFound(t *testing.T) {
 func TestTranslateStoreErrorMapsUniqueViolationToConflict(t *testing.T) {
 	t.Parallel()
 
-	err := translateStoreError(&pgconn.PgError{Code: "23505"})
+	err := translateStoreError(turso.ErrTursoConstraint)
 
 	require.Error(t, err)
 	require.ErrorIs(t, err, errs.ErrConflict)
@@ -211,7 +206,7 @@ func TestPatchPreservesOmittedFieldsAndClearsNullableOnNull(t *testing.T) {
 	t.Parallel()
 
 	email := "alice@example.com"
-	birthTime := time.Date(2024, 10, 1, 0, 0, 0, 0, time.UTC)
+	birth := "2024-10-01"
 
 	var captured query.UpdateUserParams
 	svc := NewUserService(stubUserStore{
@@ -225,7 +220,7 @@ func TestPatchPreservesOmittedFieldsAndClearsNullableOnNull(t *testing.T) {
 				Email:    &email,
 				UsedName: "Ali",
 				Company:  "ACME",
-				Birth:    &birthTime,
+				Birth:    &birth,
 			}, nil
 		},
 		listFn: func(context.Context, query.ListUsersParams) ([]query.User, error) {
@@ -256,8 +251,8 @@ func TestPatchPreservesOmittedFieldsAndClearsNullableOnNull(t *testing.T) {
 	require.Equal(t, "Alice", captured.Name)
 	require.Equal(t, "Ali", captured.UsedName)
 	require.Equal(t, "Example Co", captured.Company)
-	require.False(t, captured.Email.Valid)
-	require.False(t, captured.Birth.Valid)
+	require.Nil(t, captured.Email)
+	require.Nil(t, captured.Birth)
 }
 
 func TestPatchRejectsBlankNameWhenProvided(t *testing.T) {

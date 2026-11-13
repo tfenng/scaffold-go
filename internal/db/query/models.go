@@ -4,20 +4,14 @@
 
 package query
 
-import (
-	"time"
-
-	"github.com/jackc/pgx/v5/pgtype"
-)
-
 type User struct {
-	ID        int64              `json:"id"`
-	Uid       string             `json:"uid"`
-	Email     *string            `json:"email"`
-	Name      string             `json:"name"`
-	UsedName  string             `json:"used_name"`
-	Company   string             `json:"company"`
-	Birth     *time.Time         `json:"birth"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	ID        int64   `json:"id"`
+	Uid       string  `json:"uid"`
+	Email     *string `json:"email"`
+	Name      string  `json:"name"`
+	UsedName  string  `json:"used_name"`
+	Company   string  `json:"company"`
+	Birth     *string `json:"birth"`
+	CreatedAt string  `json:"created_at"`
+	UpdatedAt string  `json:"updated_at"`
 }

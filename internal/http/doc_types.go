@@ -33,8 +33,8 @@ type UserResponse struct {
 	UsedName  string  `json:"used_name" example:"Ali"`
 	Company   string  `json:"company" example:"ACME"`
 	Birth     *string `json:"birth,omitempty" example:"1990-01-01"`
-	CreatedAt string  `json:"created_at" example:"Mon, 02 Jan 2006 15:04:05 GMT"`
-	UpdatedAt string  `json:"updated_at" example:"Mon, 02 Jan 2006 15:04:05 GMT"`
+	CreatedAt string  `json:"created_at" example:"2026-03-29T12:00:00Z"`
+	UpdatedAt string  `json:"updated_at" example:"2026-03-29T12:00:00Z"`
 }
 
 // PatchUserRequest PATCH 用户请求结构.

@@ -473,7 +473,7 @@ const docTemplate = `{
                 },
                 "created_at": {
                     "type": "string",
-                    "example": "Mon, 02 Jan 2006 15:04:05 GMT"
+                    "example": "2026-03-29T12:00:00Z"
                 },
                 "email": {
                     "type": "string",
@@ -493,7 +493,7 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string",
-                    "example": "Mon, 02 Jan 2006 15:04:05 GMT"
+                    "example": "2026-03-29T12:00:00Z"
                 },
                 "used_name": {
                     "type": "string",

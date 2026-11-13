@@ -1,11 +1,11 @@
 CREATE TABLE IF NOT EXISTS users (
-    id BIGSERIAL PRIMARY KEY,
-    uid VARCHAR(64) NOT NULL UNIQUE,
-    email VARCHAR(255) UNIQUE,
-    name VARCHAR(255) NOT NULL,
-    used_name VARCHAR(255) NOT NULL DEFAULT '',
-    company VARCHAR(255) NOT NULL DEFAULT '',
-    birth DATE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    uid TEXT NOT NULL UNIQUE,
+    email TEXT UNIQUE,
+    name TEXT NOT NULL,
+    used_name TEXT NOT NULL DEFAULT '',
+    company TEXT NOT NULL DEFAULT '',
+    birth TEXT,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );

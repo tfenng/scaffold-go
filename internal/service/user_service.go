@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/mail"
@@ -11,9 +12,7 @@ import (
 	"scaffold-api/internal/db/query"
 	"scaffold-api/internal/errs"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgtype"
+	turso "turso.tech/database/tursogo"
 )
 
 const (
@@ -119,10 +118,10 @@ func (s *UserService) Create(ctx context.Context, input CreateUserInput) (*query
 	user, err := s.store.CreateUser(ctx, query.CreateUserParams{
 		Uid:      uid,
 		Name:     name,
-		Email:    nullableText(normalizeOptionalString(input.Email)),
+		Email:    normalizeOptionalString(input.Email),
 		UsedName: strings.TrimSpace(input.UsedName),
 		Company:  strings.TrimSpace(input.Company),
-		Birth:    nullableDate(birth),
+		Birth:    birth,
 	})
 	if err != nil {
 		return nil, translateStoreError(err)
@@ -154,15 +153,15 @@ func (s *UserService) List(ctx context.Context, input ListUsersInput) (*UserPage
 	}
 
 	filters := query.CountUsersParams{
-		Email:    nullableText(normalizeOptionalString(input.Email)),
-		NameLike: nullableText(normalizeOptionalString(input.NameLike)),
+		Email:    normalizeOptionalString(input.Email),
+		NameLike: normalizeOptionalString(input.NameLike),
 	}
 
 	items, err := s.store.ListUsers(ctx, query.ListUsersParams{
 		Email:    filters.Email,
 		NameLike: filters.NameLike,
-		Offset:   int32((page - 1) * pageSize),
-		Limit:    int32(pageSize),
+		Offset:   int64((page - 1) * pageSize),
+		Limit:    int64(pageSize),
 	})
 	if err != nil {
 		return nil, translateStoreError(err)
@@ -197,10 +196,10 @@ func (s *UserService) Update(ctx context.Context, id int64, input UpdateUserInpu
 	user, err := s.store.UpdateUser(ctx, query.UpdateUserParams{
 		ID:       id,
 		Name:     name,
-		Email:    nullableText(normalizeOptionalString(input.Email)),
+		Email:    normalizeOptionalString(input.Email),
 		UsedName: strings.TrimSpace(input.UsedName),
 		Company:  strings.TrimSpace(input.Company),
-		Birth:    nullableDate(birth),
+		Birth:    birth,
 	})
 	if err != nil {
 		return nil, translateStoreError(err)
@@ -218,10 +217,10 @@ func (s *UserService) Patch(ctx context.Context, id int64, input PatchUserInput)
 	params := query.UpdateUserParams{
 		ID:       id,
 		Name:     current.Name,
-		Email:    nullableText(current.Email),
+		Email:    current.Email,
 		UsedName: current.UsedName,
 		Company:  current.Company,
-		Birth:    nullableDate(current.Birth),
+		Birth:    current.Birth,
 	}
 
 	if input.Name.Set {
@@ -253,7 +252,7 @@ func (s *UserService) Patch(ctx context.Context, id int64, input PatchUserInput)
 				})
 			}
 		}
-		params.Email = nullableText(email)
+		params.Email = email
 	}
 
 	if input.UsedName.Set {
@@ -281,7 +280,7 @@ func (s *UserService) Patch(ctx context.Context, id int64, input PatchUserInput)
 		if err != nil {
 			return nil, err
 		}
-		params.Birth = nullableDate(birth)
+		params.Birth = birth
 	}
 
 	if !input.Name.Set && !input.Email.Set && !input.UsedName.Set && !input.Company.Set && !input.Birth.Set {
@@ -307,7 +306,7 @@ func (s *UserService) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 
-func parseBirth(value *string) (*time.Time, error) {
+func parseBirth(value *string) (*string, error) {
 	if value == nil {
 		return nil, nil
 	}
@@ -317,14 +316,13 @@ func parseBirth(value *string) (*time.Time, error) {
 		return nil, nil
 	}
 
-	parsed, err := time.Parse(dateLayout, raw)
-	if err != nil {
+	if _, err := time.Parse(dateLayout, raw); err != nil {
 		return nil, errs.NewInvalidArgument("birth must be in YYYY-MM-DD format", map[string]string{
 			"birth": "birth must use YYYY-MM-DD",
 		})
 	}
 
-	return &parsed, nil
+	return &raw, nil
 }
 
 func normalizeRequiredString(value *string) string {
@@ -347,33 +345,15 @@ func normalizeOptionalString(value *string) *string {
 	return &trimmed
 }
 
-func nullableText(value *string) pgtype.Text {
-	if value == nil {
-		return pgtype.Text{}
-	}
-	return pgtype.Text{String: *value, Valid: true}
-}
-
-func nullableDate(value *time.Time) pgtype.Date {
-	if value == nil {
-		return pgtype.Date{}
-	}
-	return pgtype.Date{Time: *value, Valid: true}
-}
-
 func translateStoreError(err error) error {
 	if err == nil {
 		return nil
 	}
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return errs.NewNotFound("user not found")
 	}
-
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
-		if pgErr.Code == "23505" {
-			return errs.NewConflict("user uid or email already exists")
-		}
+	if errors.Is(err, turso.ErrTursoConstraint) {
+		return errs.NewConflict("user uid or email already exists")
 	}
 
 	var appErr *errs.AppError

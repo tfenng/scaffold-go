@@ -1,20 +1,25 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-`main.go` is the entrypoint that wires config, logging, database access, services, and HTTP routes. Keep application code under `internal/`: `internal/http` for handlers and middleware, `internal/service` for business rules, `internal/db` for store and database setup, `internal/config` for env-driven config, and `internal/errs` for shared error types. SQL sources live in `db/query/*.sql`, migrations in `db/migrations/`, and generated artifacts in `internal/db/query/` and `docs/`. Treat generated files as derived output: regenerate them instead of editing by hand.
+`main.go` is the entrypoint that wires config, logging, database access, services, and HTTP routes. Keep application code under `internal/`: `internal/http` for handlers and middleware, `internal/service` for business rules, `internal/db` for store, database setup, and migrations, `internal/config` for env-driven config, `internal/errs` for shared error types, and `internal/webui` for the embedded frontend handler. Manual migration tooling lives in `cmd/migrate`. SQL sources live in `db/query/*.sql`, migrations in `db/migrations/`, and generated artifacts in `internal/db/query/` and `docs/`. Treat generated files as derived output: regenerate them instead of editing by hand.
 
 ## Build, Test, and Development Commands
 Use the `Makefile` as the default interface:
 
 - `make dev` loads `.env.dev` and runs the API locally.
+- `make dev-web` runs the Next.js dev server for the `scaffold-web` submodule.
 - `make build` verifies the project compiles with `go build ./...`.
+- `make web` builds the frontend into `internal/webui/dist`.
+- `make release` produces the single self-contained binary at `bin/scaffold-api`.
 - `make test` runs all Go tests with `go test ./...`.
 - `make sqlc` regenerates query code from `sqlc.yaml`.
 - `make swagger` regenerates Swagger docs via `go generate ./...`.
 - `make swagger-check` regenerates docs and fails if committed Swagger files are stale.
-- `make migrate-up` / `make migrate-down` apply migrations using `DB_DSN`.
+- `make migrate-up` / `make migrate-down` apply migrations using `DB_PATH` (or its default).
 
-For container work, use `./build.sh` and `./run.sh`.
+On Windows without `make`, use `./dev.ps1` (run locally) and `./build.ps1` (build the frontend and produce the single binary).
+
+The project targets Go 1.24+ and uses an embedded Turso (SQLite-compatible) database, so no external database or container is required.
 
 ## Coding Style & Naming Conventions
 Follow standard Go style: run `gofmt` on every change, keep imports organized, and prefer small packages with clear responsibilities. Use `CamelCase` for exported identifiers and `camelCase` for unexported names. Keep HTTP DTOs and validation tags close to handlers or services, and place SQL changes in `db/query/users.sql` before regenerating `sqlc` output.

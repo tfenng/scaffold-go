@@ -1,14 +1,12 @@
 -- name: CreateUser :one
-INSERT INTO users (uid, name, email, used_name, company, birth, created_at, updated_at)
+INSERT INTO users (uid, name, email, used_name, company, birth)
 VALUES (
   sqlc.arg('uid'),
   sqlc.arg('name'),
-  sqlc.narg('email')::text,
+  sqlc.narg('email'),
   sqlc.arg('used_name'),
   sqlc.arg('company'),
-  sqlc.narg('birth')::date,
-  NOW(),
-  NOW()
+  sqlc.narg('birth')
 )
 RETURNING id, uid, email, name, used_name, company, birth, created_at, updated_at;
 
@@ -20,25 +18,25 @@ WHERE id = sqlc.arg('id');
 -- name: ListUsers :many
 SELECT id, uid, email, name, used_name, company, birth, created_at, updated_at
 FROM users
-WHERE (sqlc.narg('email')::text IS NULL OR email = sqlc.narg('email')::text)
-  AND (sqlc.narg('name_like')::text IS NULL OR name ILIKE '%' || sqlc.narg('name_like')::text || '%')
+WHERE (CAST(sqlc.narg('email') AS TEXT) IS NULL OR email = CAST(sqlc.narg('email') AS TEXT))
+  AND (CAST(sqlc.narg('name_like') AS TEXT) IS NULL OR name LIKE '%' || CAST(sqlc.narg('name_like') AS TEXT) || '%')
 ORDER BY created_at DESC, id DESC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: CountUsers :one
 SELECT COUNT(1)
 FROM users
-WHERE (sqlc.narg('email')::text IS NULL OR email = sqlc.narg('email')::text)
-  AND (sqlc.narg('name_like')::text IS NULL OR name ILIKE '%' || sqlc.narg('name_like')::text || '%');
+WHERE (CAST(sqlc.narg('email') AS TEXT) IS NULL OR email = CAST(sqlc.narg('email') AS TEXT))
+  AND (CAST(sqlc.narg('name_like') AS TEXT) IS NULL OR name LIKE '%' || CAST(sqlc.narg('name_like') AS TEXT) || '%');
 
 -- name: UpdateUser :one
 UPDATE users
 SET name = sqlc.arg('name'),
-    email = sqlc.narg('email')::text,
+    email = sqlc.narg('email'),
     used_name = sqlc.arg('used_name'),
     company = sqlc.arg('company'),
-    birth = sqlc.narg('birth')::date,
-    updated_at = NOW()
+    birth = sqlc.narg('birth'),
+    updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
 WHERE id = sqlc.arg('id')
 RETURNING id, uid, email, name, used_name, company, birth, created_at, updated_at;
 

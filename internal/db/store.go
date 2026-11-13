@@ -2,23 +2,21 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"scaffold-api/internal/db/query"
-
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Store struct {
-	pool    *pgxpool.Pool
+	db      *sql.DB
 	queries *query.Queries
 }
 
-func NewStore(pool *pgxpool.Pool, queries *query.Queries) *Store {
+func NewStore(db *sql.DB) *Store {
 	return &Store{
-		pool:    pool,
-		queries: queries,
+		db:      db,
+		queries: query.New(db),
 	}
 }
 
@@ -47,17 +45,17 @@ func (s *Store) DeleteUser(ctx context.Context, id int64) (int64, error) {
 }
 
 func (s *Store) WithTx(ctx context.Context, fn func(*query.Queries) error) error {
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback()
 
 	if err := fn(s.queries.WithTx(tx)); err != nil {
 		return err
 	}
 
-	if err := tx.Commit(ctx); err != nil {
+	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit transaction: %w", err)
 	}
 

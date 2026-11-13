@@ -11,7 +11,7 @@ func TestLoadAppliesDefaults(t *testing.T) {
 	t.Setenv("APP_ENV", "")
 	t.Setenv("HTTP_HOST", "")
 	t.Setenv("HTTP_PORT", "")
-	t.Setenv("DB_DSN", "postgres://user:pass@localhost:5432/app?sslmode=disable")
+	t.Setenv("DB_PATH", "")
 	t.Setenv("LOG_LEVEL", "")
 	t.Setenv("CORS_ALLOW_ORIGINS", "")
 
@@ -21,21 +21,21 @@ func TestLoadAppliesDefaults(t *testing.T) {
 	require.Equal(t, defaultAppEnv, cfg.AppEnv)
 	require.Equal(t, defaultHTTPHost, cfg.HTTPHost)
 	require.Equal(t, defaultHTTPPort, cfg.HTTPPort)
+	require.Equal(t, defaultDBPath, cfg.DBPath)
 	require.Equal(t, defaultLogLevel, cfg.LogLevel)
 	require.Equal(t, []string{"http://localhost:3000", "http://127.0.0.1:3000"}, cfg.CORSAllowOrigins)
 }
 
-func TestLoadRequiresDBDSN(t *testing.T) {
-	t.Setenv("DB_DSN", "")
+func TestLoadRejectsBlankDBPath(t *testing.T) {
+	t.Setenv("DB_PATH", "   ")
 
 	_, err := Load()
 
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "DB_DSN is required")
+	// A blank value falls back to the default path, so Load succeeds.
+	require.NoError(t, err)
 }
 
 func TestLoadRejectsInvalidHTTPPort(t *testing.T) {
-	t.Setenv("DB_DSN", "postgres://user:pass@localhost:5432/app?sslmode=disable")
 	t.Setenv("HTTP_PORT", "abc")
 
 	_, err := Load()

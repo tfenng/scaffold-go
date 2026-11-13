@@ -12,7 +12,6 @@ import (
 	_ "scaffold-api/docs"
 	"scaffold-api/internal/config"
 	"scaffold-api/internal/db"
-	"scaffold-api/internal/db/query"
 	httpapi "scaffold-api/internal/http"
 	"scaffold-api/internal/logger"
 	"scaffold-api/internal/service"
@@ -46,13 +45,18 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	pool, err := db.NewPool(ctx, cfg)
+	sqlDB, err := db.Open(ctx, cfg)
 	if err != nil {
 		return err
 	}
-	defer pool.Close()
+	defer sqlDB.Close()
 
-	store := db.NewStore(pool, query.New(pool))
+	if err := db.MigrateUp(ctx, sqlDB); err != nil {
+		return fmt.Errorf("migrate database: %w", err)
+	}
+	appLogger.Info("database ready", "path", cfg.DBPath)
+
+	store := db.NewStore(sqlDB)
 	userService := service.NewUserService(store)
 	handler := httpapi.NewHandler(cfg, appLogger, userService)
 

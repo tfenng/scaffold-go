@@ -12,6 +12,7 @@ const (
 	defaultAppEnv          = "dev"
 	defaultHTTPHost        = "0.0.0.0"
 	defaultHTTPPort        = 8080
+	defaultDBPath          = "./data/scaffold.db"
 	defaultLogLevel        = "info"
 	defaultServiceName     = "scaffold-api"
 	defaultReadTimeout     = 15 * time.Second
@@ -24,7 +25,7 @@ type Config struct {
 	AppEnv           string
 	HTTPHost         string
 	HTTPPort         int
-	DBDSN            string
+	DBPath           string
 	LogLevel         string
 	CORSAllowOrigins []string
 	ReadTimeout      time.Duration
@@ -43,7 +44,7 @@ func Load() (*Config, error) {
 		AppEnv:           stringFromEnv("APP_ENV", defaultAppEnv),
 		HTTPHost:         stringFromEnv("HTTP_HOST", defaultHTTPHost),
 		HTTPPort:         httpPort,
-		DBDSN:            strings.TrimSpace(os.Getenv("DB_DSN")),
+		DBPath:           stringFromEnv("DB_PATH", defaultDBPath),
 		LogLevel:         stringFromEnv("LOG_LEVEL", defaultLogLevel),
 		CORSAllowOrigins: csvFromEnv("CORS_ALLOW_ORIGINS", []string{"http://localhost:3000", "http://127.0.0.1:3000"}),
 		ReadTimeout:      defaultReadTimeout,
@@ -106,8 +107,8 @@ func (c Config) Validate() error {
 	if c.HTTPPort <= 0 || c.HTTPPort > 65535 {
 		return fmt.Errorf("invalid HTTP_PORT: %d", c.HTTPPort)
 	}
-	if c.DBDSN == "" {
-		return fmt.Errorf("DB_DSN is required")
+	if strings.TrimSpace(c.DBPath) == "" {
+		return fmt.Errorf("DB_PATH is required")
 	}
 	if c.ReadTimeout <= 0 {
 		return fmt.Errorf("read timeout must be positive")
