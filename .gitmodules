@@ -1,0 +1,3 @@
+[submodule "scaffold-web"]
+	path = scaffold-web
+	url = https://github.com/tfenng/scaffold-web.git
