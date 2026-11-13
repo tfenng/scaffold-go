@@ -68,6 +68,15 @@ func TestStoreCRUDRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(1), count)
 
+	list, err := store.ListUsers(ctx, query.ListUsersParams{Offset: 0, Limit: 20})
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	require.Equal(t, "Alice Chen", list[0].Name)
+
+	filtered, err := store.ListUsers(ctx, query.ListUsersParams{Email: &email, Offset: 0, Limit: 20})
+	require.NoError(t, err)
+	require.Len(t, filtered, 1)
+
 	rows, err := store.DeleteUser(ctx, created.ID)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), rows)

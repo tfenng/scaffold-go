@@ -20,6 +20,7 @@ param(
     [string]$WebDir = "scaffold-web",
     [string]$DistDir = "internal/webui/dist",
     [string]$Output = "bin/scaffold-api.exe",
+    [string]$ApiBaseUrl = "",
     [switch]$SkipInstall
 )
 
@@ -44,6 +45,10 @@ After opening a new shell, either install pnpm or let this script use npm:
     npm install -g pnpm
 "@
 }
+
+# Default to a relative base URL so the embedded UI calls the same origin.
+# Override with -ApiBaseUrl when the API lives on a different host.
+$env:NEXT_PUBLIC_API_URL = $ApiBaseUrl
 
 Push-Location -LiteralPath $WebDir
 try {
